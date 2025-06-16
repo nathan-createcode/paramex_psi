@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
+import gambarRegister from "../assets/gambar_register.png"
 
 const RegisterPage = () => {
   const [name, setName] = useState("")
@@ -138,115 +139,105 @@ const RegisterPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white flex">
-      {/* Ilustrasi - Bagian Kiri */}
-      <div className="hidden lg:flex lg:w-1/2 bg-white items-center justify-center">
-        <div className="p-12 flex items-center justify-center">
-          {/* Placeholder untuk ilustrasi */}
-          <div className="w-full max-w-md h-96 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400">
-            Ilustrasi akan ditempatkan di sini
-          </div>
-        </div>
-      </div>
+  <div className="min-h-screen bg-white flex flex-col lg:flex-row">
+    {/* Bagian Ilustrasi */}
+    <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-white">
+  {/* Gambar Register */}
+  <img
+    src={gambarRegister}
+    alt="Register Illustration"
+    className="w-[70%] h-auto object-contain"
+  />
+</div>
 
-      {/* Form Register - Bagian Kanan */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-16 lg:px-24">
+
+    {/* Bagian Form */}
+    <div className="w-full lg:w-1/2 flex items-center justify-center px-6 md:px-12 lg:px-24 py-12">
+      <div className="w-full max-w-md">
         <h1 className="text-3xl font-bold mb-3 text-gray-800">Create new account</h1>
-        <p className="text-gray-600 mb-10">Sign up to start managing your project</p>
+        <p className="text-gray-600 mb-8">Sign up to start managing your project</p>
 
+        {/* Tampilkan Error */}
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-8">
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-6">
             <p className="font-medium">Error:</p>
             <p>{error}</p>
-            <p className="mt-2 text-sm">
-              Coba gunakan email dengan domain yang berbeda seperti gmail.com atau outlook.com.
-            </p>
           </div>
         )}
 
-        {successMessage && <div className="bg-green-50 text-green-600 p-3 rounded-lg mb-8">{successMessage}</div>}
-
-        {/* Debug info - hanya tampilkan saat development */}
-        {debugInfo && import.meta.env.DEV && (
-          <div className="bg-gray-50 p-3 rounded-lg mb-8 text-xs overflow-auto max-h-40">
-            <p className="font-medium">Debug Info:</p>
-            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+        {/* Tampilkan Pesan Sukses */}
+        {successMessage && (
+          <div className="bg-green-50 text-green-600 p-3 rounded-lg mb-6">
+            {successMessage}
           </div>
         )}
 
         <form onSubmit={handleRegister}>
-          <div className="mb-8">
-            <label htmlFor="name" className="block text-gray-700 mb-3">
-              Name
-            </label>
+          {/* Input Name */}
+          <div className="mb-6">
+            <label htmlFor="name" className="block text-gray-700 mb-2">Name</label>
             <input
               id="name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter Your name"
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              className="w-full px-5 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
               required
             />
           </div>
 
-          <div className="mb-8">
-            <label htmlFor="email" className="block text-gray-700 mb-3">
-              Email
-            </label>
+          {/* Input Email */}
+          <div className="mb-6">
+            <label htmlFor="email" className="block text-gray-700 mb-2">Email</label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter Your Email"
-              className={`w-full px-4 py-3 rounded-lg border ${
-                email && !validateEmail(email) ? "border-red-300" : "border-gray-300"
+              className={`w-full px-5 py-3 rounded-2xl border ${
+                email && !validateEmail(email) ? "border-red-400" : "border-gray-300"
               } focus:outline-none focus:ring-2 focus:ring-gray-200`}
               required
             />
-            {email && !validateEmail(email) && <p className="mt-1 text-sm text-red-600">Format email tidak valid</p>}
-            <p className="mt-1 text-xs text-gray-500">
-              Gunakan email dengan domain populer seperti gmail.com atau outlook.com
-            </p>
+            {email && !validateEmail(email) && (
+              <p className="mt-1 text-sm text-red-600">Format email tidak valid</p>
+            )}
           </div>
 
-          <div className="mb-10">
-            <label htmlFor="password" className="block text-gray-700 mb-3">
-              Password
-            </label>
+          {/* Input Password */}
+          <div className="mb-8">
+            <label htmlFor="password" className="block text-gray-700 mb-2">Password</label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter Your Password"
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              className="w-full px-5 py-3 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
               required
               minLength={6}
             />
-            <p className="mt-1 text-xs text-gray-500">Minimal 6 karakter</p>
           </div>
 
-          {/* Tombol dengan desain yang konsisten dengan landing page */}
+          {/* Tombol Register */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-4 py-3 rounded-xl bg-black text-white shadow-[6px_6px_12px_#e8e8e8,_-6px_-6px_12px_#ffffff] hover:bg-black/90 transition-colors"
+            className="w-full px-5 py-3 rounded-2xl bg-black text-white font-semibold hover:bg-gray-900 transition"
           >
             {loading ? "Registering..." : "Register"}
           </button>
         </form>
 
-        <p className="mt-10 text-center text-gray-600">
+        <p className="mt-8 text-center text-gray-600">
           Have an account?{" "}
-          <Link to="/login" className="text-blue-600 hover:underline">
-            Login
-          </Link>
+          <Link to="/login" className="text-blue-600 hover:underline">Login</Link>
         </p>
       </div>
     </div>
-  )
+  </div>
+)
 }
-
 export default RegisterPage
