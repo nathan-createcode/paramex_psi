@@ -131,7 +131,8 @@ const RegisterPage = () => {
       } else if (error.message.includes("Password should be at least")) {
         setError("Password terlalu pendek. Gunakan minimal 6 karakter.")
       } else {
-        setError(error.message)
+        console.error("Error tidak dikenali:", error)
+        setError("Terjadi kesalahan. Silakan coba lagi.")
       }
     } finally {
       setLoading(false)
@@ -155,7 +156,7 @@ const RegisterPage = () => {
     <div className="w-full lg:w-1/2 flex items-center justify-center px-6 md:px-12 lg:px-24 py-12">
       <div className="w-full max-w-md">
         <h1 className="text-3xl font-bold mb-3 text-gray-800">Create new account</h1>
-        <p className="text-gray-600 mb-8">Sign up to start managing your project</p>
+        <p className="text-gray-600 mb-8 text-sm">Sign up to start managing your project</p>
 
         {/* Tampilkan Error */}
         {error && (

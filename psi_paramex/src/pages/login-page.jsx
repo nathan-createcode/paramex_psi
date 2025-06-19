@@ -42,9 +42,10 @@ const LoginPage = () => {
             
 
             <h1 className="text-3xl font-bold mb-1 text-gray-800">Login to your account</h1>
-            <p className="text-blue-600 mb-8 underline cursor-pointer text-sm">
+            <p className="text-gray-600 mb-8 text-sm">
               Enter your email and password to login
-            </p>
+              </p>
+
 
             {error && <div className="bg-red-100 text-red-600 p-3 rounded mb-4">{error}</div>}
 
