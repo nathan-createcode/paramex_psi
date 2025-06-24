@@ -2,7 +2,7 @@
 
 import { useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Settings,
   BadgeHelp,
@@ -19,6 +19,8 @@ const Sidebar = ({ open, setOpen }) => {
   const location = useLocation()
 
   const [user, setUser] = useState(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const prevOpen = useRef(open)
 
   const navItems = [
     {
@@ -59,6 +61,17 @@ const Sidebar = ({ open, setOpen }) => {
     }
     getUser()
   }, [])
+
+  useEffect(() => {
+    if (prevOpen.current !== open) {
+      setIsTransitioning(true)
+      prevOpen.current = open
+    }
+  }, [open])
+
+  const handleTransitionEnd = () => {
+    setIsTransitioning(false)
+  }
 
   // Helper function to get user initials
   const getUserInitials = (user) => {
@@ -115,112 +128,127 @@ const Sidebar = ({ open, setOpen }) => {
 
   return (
     <aside
+      className={`fixed top-0 left-0 h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out z-50 ${
+        open ? "w-[280px]" : "w-20"
+      } ${isTransitioning ? "overflow-hidden" : "overflow-visible"}`}
       style={{
-        ...styles.sidebar,
-        width: open ? "280px" : "80px",
+        boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
       }}
+      onTransitionEnd={handleTransitionEnd}
     >
       {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerContent}>
-          <div style={styles.logo}>
-            <div style={styles.logoIcon}>
-              <img src="/src/assets/logo.png" alt="logo" width="32" height="32" style={styles.logoImage} />
+      <div className="h-16 p-4 border-b border-gray-100 flex items-center">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center p-2"
+              style={{
+                background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+                boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+              }}
+            >
+              <img
+                src="/src/assets/logo.png"
+                alt="logo"
+                width="32"
+                height="32"
+                className="w-full h-full object-contain brightness-0 invert"
+              />
             </div>
-            {open && <h1 style={styles.logoText}>Flowtica</h1>}
+            {open && <h1 className="text-xl font-bold text-gray-800 m-0">Flowtica</h1>}
           </div>
           <button
             onClick={() => setOpen(!open)}
-            style={styles.toggleButton}
+            className={`absolute top-[50px] z-[100] rounded-full p-0 border-none bg-white transition-all duration-300 ${
+              open ? "left-[264px]" : "left-[60px]"
+            }`}
+            style={{
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            }}
             title={open ? "Collapse sidebar" : "Expand sidebar"}
           >
-            <ChevronLeft
-              size={20}
-              color="#6B7280"
+            <div
+              className="w-[35px] h-[35px] rounded-full flex items-center justify-center"
               style={{
-                transform: open ? "rotate(0deg)" : "rotate(180deg)",
-                transition: "transform 0.3s",
+                background: open ? "#FFFFFF" : "#F3F4F6",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
               }}
-            />
+            >
+              <ChevronLeft
+                size={18}
+                color="#6B7280"
+                className={`transition-transform duration-500 ${open ? "rotate-0" : "rotate-180"}`}
+              />
+            </div>
           </button>
         </div>
       </div>
 
       {/* Main Navigation */}
-      <nav style={styles.nav}>
-        <div style={styles.navSection}>
+      <nav className="flex-1 p-4 flex flex-col gap-6 overflow-y-auto">
+        <div className="flex flex-col gap-1">
           {open && (
-            <div style={styles.sectionHeader}>
-              <h2 style={styles.sectionTitle}>MAIN MENU</h2>
+            <div className="p-3">
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0">MAIN MENU</h2>
             </div>
           )}
           {navItems.map((item) => {
             const IconComponent = item.icon
+            const active = isActive(item.href)
             return (
               <button
                 key={item.href}
                 onClick={() => navigate(item.href)}
+                className={`flex items-center gap-3 p-3 rounded-xl border-none cursor-pointer text-sm font-medium transition-all duration-200 ease-in-out text-left w-full ${
+                  active
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "bg-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                }`}
                 style={{
-                  ...styles.navItem,
-                  ...(isActive(item.href) ? styles.navItemActive : {}),
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive(item.href)) {
-                    e.target.style.backgroundColor = "#F3F4F6"
-                    e.target.style.color = "#374151"
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive(item.href)) {
-                    e.target.style.backgroundColor = "transparent"
-                    e.target.style.color = "#6B7280"
-                  }
+                  boxShadow: active
+                    ? "inset 2px 2px 5px rgba(0, 0, 0, 0.05), inset -2px -2px 5px rgba(255, 255, 255, 0.8)"
+                    : "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
                 }}
                 title={!open ? item.name : undefined}
               >
-                <IconComponent size={20} color={isActive(item.href) ? "#3B82F6" : "currentColor"} />
-                {open && <span style={styles.navItemText}>{item.name}</span>}
+                <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
+                {open && <span className="flex-1">{item.name}</span>}
               </button>
             )
           })}
         </div>
 
         {/* Secondary Navigation */}
-        <div style={styles.navSection}>
+        <div className="flex flex-col gap-1">
           {open && (
-            <div style={styles.sectionHeader}>
-              <h2 style={styles.sectionTitle}>OTHER</h2>
+            <div className="p-3">
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0">OTHER</h2>
             </div>
           )}
           {secondaryItems.map((item) => {
             const IconComponent = item.icon
+            const active = isActive(item.href)
             return (
               <button
                 key={item.href}
                 onClick={() => navigate(item.href)}
+                className={`flex items-center gap-3 p-3 rounded-xl border-none cursor-pointer text-sm font-medium transition-all duration-200 ease-in-out text-left w-full ${
+                  active
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "bg-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                }`}
                 style={{
-                  ...styles.navItem,
-                  ...(isActive(item.href) ? styles.navItemActive : {}),
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive(item.href)) {
-                    e.target.style.backgroundColor = "#F3F4F6"
-                    e.target.style.color = "#374151"
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive(item.href)) {
-                    e.target.style.backgroundColor = "transparent"
-                    e.target.style.color = "#6B7280"
-                  }
+                  boxShadow: active
+                    ? "inset 2px 2px 5px rgba(0, 0, 0, 0.05), inset -2px -2px 5px rgba(255, 255, 255, 0.8)"
+                    : "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
                 }}
                 title={!open ? item.name : item.description}
               >
-                <IconComponent size={20} color={isActive(item.href) ? "#3B82F6" : "currentColor"} />
+                <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
                 {open && (
-                  <div style={styles.navItemContent}>
-                    <span style={styles.navItemText}>{item.name}</span>
-                    <span style={styles.navItemDescription}>{item.description}</span>
+                  <div className="flex-1 flex flex-col gap-0.5">
+                    <span>{item.name}</span>
+                    <span className="text-xs text-gray-400">{item.description}</span>
                   </div>
                 )}
               </button>
@@ -230,15 +258,30 @@ const Sidebar = ({ open, setOpen }) => {
 
         {/* User Info Card */}
         {open && (
-          <div style={styles.userSection}>
-            <div style={styles.userCard}>
-              <div style={styles.userInfo}>
-                <div style={styles.userAvatar}>
-                  <span style={styles.userInitials}>{getUserInitials(user)}</span>
+          <div className="pt-6">
+            <div
+              className="rounded-xl p-4 border border-gray-200"
+              style={{
+                background: "linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%)",
+                boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  style={{
+                    background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
+                  }}
+                >
+                  <span className="text-white font-semibold text-sm">{getUserInitials(user)}</span>
                 </div>
-                <div style={styles.userDetails}>
-                  <p style={styles.userName}>{getDisplayName(user)}</p>
-                  <p style={styles.userRole}>Freelance Developer</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 m-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {getDisplayName(user)}
+                  </p>
+                  <p className="text-xs text-gray-500 m-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                    Freelance Developer
+                  </p>
                 </div>
               </div>
             </div>
@@ -247,227 +290,21 @@ const Sidebar = ({ open, setOpen }) => {
       </nav>
 
       {/* Logout Button */}
-      <div style={styles.logoutSection}>
+      <div className="p-4 border-t border-gray-100">
         <button
           onClick={handleLogout}
-          style={styles.logoutButton}
+          className="flex items-center gap-3 p-3 rounded-xl border border-red-200 bg-red-50 text-red-600 cursor-pointer text-sm font-medium transition-all duration-200 ease-in-out w-full hover:bg-red-100 hover:border-red-300"
+          style={{
+            boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+          }}
           title={!open ? "Logout" : undefined}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = "#FEE2E2"
-            e.target.style.borderColor = "#FCA5A5"
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = "#FEF2F2"
-            e.target.style.borderColor = "#FECACA"
-          }}
         >
           <LogOut size={20} color="#EF4444" />
-          {open && <span style={styles.logoutText}>Logout</span>}
+          {open && <span className="text-red-700">Logout</span>}
         </button>
       </div>
     </aside>
   )
-}
-
-const styles = {
-  sidebar: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    height: "100vh",
-    backgroundColor: "white",
-    borderRight: "1px solid #E5E7EB",
-    display: "flex",
-    flexDirection: "column",
-    transition: "width 0.3s ease-in-out",
-    zIndex: 50,
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-  },
-  header: {
-    height: "64px",
-    padding: "16px",
-    borderBottom: "1px solid #F3F4F6",
-    display: "flex",
-    alignItems: "center",
-  },
-  headerContent: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  logo: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  logoIcon: {
-    width: "48px",
-    height: "48px",
-    borderRadius: "12px",
-    background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-    padding: "8px",
-  },
-  logoImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    filter: "brightness(0) invert(1)",
-  },
-  logoText: {
-    fontSize: "20px",
-    fontWeight: "bold",
-    color: "#1F2937",
-    margin: 0,
-  },
-  toggleButton: {
-    padding: "8px",
-    borderRadius: "50%",
-    border: "none",
-    backgroundColor: "transparent",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "background-color 0.2s",
-  },
-  nav: {
-    flex: 1,
-    padding: "16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-    overflowY: "auto",
-  },
-  navSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  sectionHeader: {
-    padding: "12px",
-  },
-  sectionTitle: {
-    fontSize: "12px",
-    fontWeight: "600",
-    color: "#9CA3AF",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    margin: 0,
-  },
-  navItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px",
-    borderRadius: "12px",
-    border: "none",
-    backgroundColor: "transparent",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#6B7280",
-    transition: "all 0.2s ease-in-out",
-    textAlign: "left",
-    width: "100%",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-  },
-  navItemActive: {
-    backgroundColor: "#EFF6FF",
-    color: "#1D4ED8",
-    border: "1px solid #DBEAFE",
-    boxShadow: "inset 2px 2px 5px rgba(0, 0, 0, 0.05), inset -2px -2px 5px rgba(255, 255, 255, 0.8)",
-  },
-  navItemText: {
-    flex: 1,
-  },
-  navItemContent: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px",
-  },
-  navItemDescription: {
-    fontSize: "12px",
-    color: "#9CA3AF",
-  },
-  userSection: {
-    paddingTop: "24px",
-  },
-  userCard: {
-    background: "linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%)",
-    borderRadius: "12px",
-    padding: "16px",
-    border: "1px solid #E5E7EB",
-    boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
-  },
-  userInfo: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  userAvatar: {
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  userInitials: {
-    color: "white",
-    fontWeight: "600",
-    fontSize: "14px",
-  },
-  userDetails: {
-    flex: 1,
-    minWidth: 0,
-  },
-  userName: {
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#1F2937",
-    margin: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  userRole: {
-    fontSize: "12px",
-    color: "#6B7280",
-    margin: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  logoutSection: {
-    padding: "16px",
-    borderTop: "1px solid #F3F4F6",
-  },
-  logoutButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px",
-    borderRadius: "12px",
-    border: "1px solid #FECACA",
-    backgroundColor: "#FEF2F2",
-    color: "#DC2626",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-    transition: "all 0.2s ease-in-out",
-    width: "100%",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-  },
-  logoutText: {
-    color: "#B91C1C",
-  },
 }
 
 export default Sidebar

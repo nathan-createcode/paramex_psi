@@ -85,7 +85,7 @@ const styles = {
     backgroundColor: "white",
     position: "sticky",
     top: 0,
-    zIndex: 50,
+    zIndex: 10,
   },
   headerContent: {
     height: "100%",

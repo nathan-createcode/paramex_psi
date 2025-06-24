@@ -12,6 +12,7 @@ import DSS from "./pages/DSS"
 import ProjectAdvisor from "./pages/ProjectAdvisor"
 import Settings from "./pages/Settings"
 import Help from "./pages/Help"
+import { ProjectForm } from "./pages/project-form"
 
 function App() {
   const [session, setSession] = useState(null)
@@ -53,6 +54,7 @@ function App() {
         <Route path="/project-advisor" element={!session ? <Navigate to="/login" /> : <ProjectAdvisor />} />
         <Route path="/settings" element={!session ? <Navigate to="/login" /> : <Settings />} />
         <Route path="/help" element={!session ? <Navigate to="/login" /> : <Help />} />
+        <Route path="project-form" element={!session ? <Navigate to="project-form"/> : <ProjectForm/>}/>
 
         {/* Account Settings Modal Route - renders dashboard with modal overlay */}
         <Route path="/account-settings" element={!session ? <Navigate to="/login" /> : <Dashboard />} />

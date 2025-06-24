@@ -88,7 +88,7 @@ const styles = {
   container: {
     display: "flex",
     minHeight: "100vh",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#FEFEFE",
   },
   mainContent: {
     flex: 1,
