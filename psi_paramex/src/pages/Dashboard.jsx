@@ -105,6 +105,9 @@ const typesChartOptions = {
   ...chartOptions,
   plugins: {
     ...chartOptions.plugins,
+    legend: {
+      display: false, // Hide legend since we show type names on x-axis
+    },
     tooltip: {
       ...chartOptions.plugins.tooltip,
       callbacks: {
@@ -114,6 +117,17 @@ const typesChartOptions = {
         afterBody: () => {
           return 'Filtered View: Shows only projects in selected time period';
         },
+      },
+    },
+  },
+  scales: {
+    ...chartOptions.scales,
+    x: {
+      ...chartOptions.scales.x,
+      ticks: {
+        ...chartOptions.scales.x.ticks,
+        maxRotation: 45, // Rotate labels if they're too long
+        minRotation: 0,
       },
     },
   },
@@ -445,14 +459,14 @@ const Dashboard = () => {
     const defaultColors = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EF4444", "#6B7280"]
 
     const typesData = {
-      labels: ["Count"],
-      datasets: projectTypeData.map((typeData, index) => ({
-        label: typeData.type,
-        data: [typeData.count],
-        backgroundColor: defaultColors[index % defaultColors.length],
+      labels: projectTypeData.map(item => item.type),
+      datasets: [{
+        label: 'Projects',
+        data: projectTypeData.map(item => item.count),
+        backgroundColor: projectTypeData.map((_, index) => defaultColors[index % defaultColors.length]),
         borderRadius: 8,
         borderSkipped: false,
-      })),
+      }],
     }
 
     // Monthly trends (last 6 months) - Global
