@@ -50,13 +50,31 @@ const DSS = () => {
       setLoading(true)
       const { data, error } = await supabase
         .from("projects")
-        .select("*")
+        .select(`
+          *,
+          type_id:type_id ( type_name ),
+          status_id:status_id ( status_name )
+        `)
         .eq("user_id", userId)
-        .neq("status", "done")
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setProjects(data || [])
+      
+      // Map the data to include status from status_id relation and correct field names
+      const mappedProjects = (data || []).map(project => ({
+        ...project,
+        id: project.project_id,
+        name: project.project_name,
+        client: project.client_name,
+        deadline: project.deadline,
+        payment: project.payment_amount,
+        difficulty: project.difficulty_level,
+        status: project.status_id?.status_name || "unknown",
+        project_type: project.type_id?.type_name || "unknown"
+      })).filter(project => project.status_id?.status_name !== "Done") // Filter out completed projects
+
+      console.log("DSS Projects loaded:", mappedProjects)
+      setProjects(mappedProjects)
     } catch (error) {
       console.error("Error fetching projects:", error)
     } finally {
@@ -216,13 +234,18 @@ const DSS = () => {
                   style={styles.select}
                 >
                   <option value="all">All Active Projects</option>
-                  <option value="on-plan">On-Plan Projects</option>
-                  <option value="on-process">On-Process Projects</option>
-                  <option value="done">Done Projects</option>
+                  <option value="On-Plan">On-Plan Projects</option>
+                  <option value="On-Process">On-Process Projects</option>
                 </select>
               </div>
 
               {/* Calculate Button */}
+              {/* Debug info */}
+              <div style={{ marginBottom: "16px", fontSize: "14px", color: "#6B7280" }}>
+                Projects loaded: {projects.length} 
+                {projects.length === 0 && " (Button disabled - no projects found)"}
+              </div>
+
               <button
                 onClick={calculatePriority}
                 disabled={calculating || projects.length === 0}
@@ -266,93 +289,105 @@ const DSS = () => {
                 </div>
               ) : (
                 <div style={styles.resultsList}>
-                  {priorityResults.map((result, index) => (
-                    <div key={result.id} style={styles.resultItem}>
-                      <div style={styles.resultRank}>#{index + 1}</div>
-                      <div style={styles.resultContent}>
-                        <div style={styles.resultHeader}>
-                          <h3 style={styles.resultTitle}>{result.name}</h3>
-                          <div style={styles.resultScore}>
-                            <span style={styles.scoreValue}>{result.score}</span>
-                            <span style={styles.scoreLabel}>Priority Score</span>
-                          </div>
-                        </div>
-                        <p style={styles.resultClient}>Client: {result.client}</p>
-                        <div style={styles.resultFactors}>
-                          <span
-                            style={{
-                              ...styles.factorBadge,
-                              backgroundColor:
-                                result.factors.deadline === "High"
-                                  ? "#FEF2F2"
-                                  : result.factors.deadline === "Medium"
-                                    ? "#FFFBEB"
-                                    : "#EFF6FF",
-                              color:
-                                result.factors.deadline === "High"
-                                  ? "#DC2626"
-                                  : result.factors.deadline === "Medium"
-                                    ? "#D97706"
-                                    : "#2563EB",
-                            }}
-                          >
-                            Deadline: {result.factors.deadline}
-                          </span>
-                          <span
-                            style={{
-                              ...styles.factorBadge,
-                              backgroundColor:
-                                result.factors.payment === "High"
-                                  ? "#ECFDF5"
-                                  : result.factors.payment === "Medium"
-                                    ? "#FFFBEB"
-                                    : "#EFF6FF",
-                              color:
-                                result.factors.payment === "High"
-                                  ? "#059669"
-                                  : result.factors.payment === "Medium"
-                                    ? "#D97706"
-                                    : "#2563EB",
-                            }}
-                          >
-                            Payment: {result.factors.payment}
-                          </span>
-                          <span
-                            style={{
-                              ...styles.factorBadge,
-                              backgroundColor:
-                                result.factors.difficulty === "high"
-                                  ? "#FEF2F2"
-                                  : result.factors.difficulty === "medium"
-                                    ? "#FFFBEB"
-                                    : "#ECFDF5",
-                              color:
-                                result.factors.difficulty === "high"
-                                  ? "#DC2626"
-                                  : result.factors.difficulty === "medium"
-                                    ? "#D97706"
-                                    : "#059669",
-                            }}
-                          >
-                            Difficulty:{" "}
-                            {result.factors.difficulty.charAt(0).toUpperCase() + result.factors.difficulty.slice(1)}
-                          </span>
-                        </div>
-                        <div style={styles.progressContainer}>
-                          <div style={styles.progressBar}>
-                            <div
-                              style={{
-                                ...styles.progressFill,
-                                width: `${result.score}%`,
-                                backgroundColor:
-                                  result.score > 75 ? "#DC2626" : result.score > 60 ? "#D97706" : "#3B82F6",
-                              }}
-                            ></div>
-                          </div>
+                  {priorityResults.map((result, index) => {
+                    // Calculate progress percentage based on highest score
+                    const maxScore = Math.max(...priorityResults.map(r => r.score))
+                    const progressPercentage = maxScore > 0 ? (result.score / maxScore) * 100 : 0
+                    
+                    return (
+                      <div key={result.id} style={styles.resultItem}>
+                          <div style={styles.resultRank}>#{index + 1}</div>
+                            <div style={styles.resultContent}>
+                              <div style={styles.resultItem2}>
+                                <div style={styles.resultContent}>
+                                  <div style={styles.resultHeader}>
+                                    <h3 style={styles.resultTitle}>{result.name}</h3>
+                                  </div>
+                                  <p style={styles.resultClient}>Client: {result.client}</p>
+                                  <div>
+                                    <div style={styles.resultFactors}>
+                                      <span
+                                        style={{
+                                          ...styles.factorBadge,
+                                          backgroundColor:
+                                            result.factors.deadline === "High"
+                                              ? "#FEF2F2"
+                                              : result.factors.deadline === "Medium"
+                                                ? "#FFFBEB"
+                                                : "#EFF6FF",
+                                          color:
+                                            result.factors.deadline === "High"
+                                              ? "#DC2626"
+                                              : result.factors.deadline === "Medium"
+                                                ? "#D97706"
+                                                : "#2563EB",
+                                        }}
+                                      >
+                                        Deadline: {result.factors.deadline}
+                                      </span>
+                                      <span
+                                        style={{
+                                          ...styles.factorBadge,
+                                          backgroundColor:
+                                            result.factors.payment === "High"
+                                              ? "#ECFDF5"
+                                              : result.factors.payment === "Medium"
+                                                ? "#FFFBEB"
+                                                : "#EFF6FF",
+                                          color:
+                                            result.factors.payment === "High"
+                                              ? "#059669"
+                                              : result.factors.payment === "Medium"
+                                                ? "#D97706"
+                                                : "#2563EB",
+                                        }}
+                                      >
+                                        Payment: {result.factors.payment}
+                                      </span>
+                                      <span
+                                        style={{
+                                          ...styles.factorBadge,
+                                          backgroundColor:
+                                            result.factors.difficulty === "high"
+                                              ? "#FEF2F2"
+                                              : result.factors.difficulty === "medium"
+                                                ? "#FFFBEB"
+                                                : "#ECFDF5",
+                                          color:
+                                            result.factors.difficulty === "high"
+                                              ? "#DC2626"
+                                              : result.factors.difficulty === "medium"
+                                                ? "#D97706"
+                                                : "#059669",
+                                        }}
+                                      >
+                                        Difficulty:{" "}
+                                        {result.factors.difficulty.charAt(0).toUpperCase() + result.factors.difficulty.slice(1)}
+                                      </span>
+                                    </div>
+                                </div>
+                              </div>
+                            <div style={styles.resultScore}>
+                              <span style={styles.scoreValue}>{result.score}</span>
+                              <span style={styles.scoreLabel}>Priority Score</span>
+                            </div>  
+                            </div>
+                                                     <div style={styles.progressContainer}>
+                             <div style={styles.progressBar}>
+                               <div
+                                 style={{
+                                   ...styles.progressFill,
+                                   width: `${progressPercentage}%`,
+                                   backgroundColor:
+                                     index === 0 ? "#DC2626" : index === 1 ? "#D97706" : index === 2 ? "#F59E0B" : "#3B82F6",
+                                 }}
+                               ></div>
+                             </div>
+                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -583,6 +618,9 @@ const styles = {
     borderRadius: "16px",
     backgroundColor: "#FAFAFA",
     boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
+  },
+  resultItem2: {
+    display: "flex",
   },
   resultRank: {
     display: "flex",
