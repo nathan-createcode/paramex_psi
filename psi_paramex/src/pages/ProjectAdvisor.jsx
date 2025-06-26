@@ -6,15 +6,32 @@ import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
 
 const ProjectAdvisor = () => {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "ai",
-      content:
-                        "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I'm connected to advanced AI capabilities to provide you with intelligent, personalized advice. What would you like to discuss today?",
-      timestamp: new Date(),
-    },
-  ])
+  // Load messages from localStorage or use default
+  const [messages, setMessages] = useState(() => {
+    try {
+      const savedMessages = localStorage.getItem('projectAdvisorMessages')
+      if (savedMessages) {
+        const parsedMessages = JSON.parse(savedMessages)
+        // Convert timestamp strings back to Date objects
+        return parsedMessages.map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }
+    } catch (error) {
+      console.error('Error loading saved messages:', error)
+    }
+    
+    // Default message if no saved messages or error
+    return [
+      {
+        id: 1,
+        type: "ai",
+        content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I'm connected to advanced AI capabilities to provide you with intelligent, personalized advice. What would you like to discuss today?",
+        timestamp: new Date(),
+      },
+    ]
+  })
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [isRevealing, setIsRevealing] = useState(false)
@@ -63,6 +80,27 @@ const ProjectAdvisor = () => {
       }
     }
   }, [])
+
+  // Save messages to localStorage whenever messages change
+  useEffect(() => {
+    try {
+      localStorage.setItem('projectAdvisorMessages', JSON.stringify(messages))
+    } catch (error) {
+      console.error('Error saving messages to localStorage:', error)
+    }
+  }, [messages])
+
+  // Function to clear chat history
+  const clearChatHistory = () => {
+    const defaultMessage = {
+      id: 1,
+      type: "ai",
+      content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I'm connected to advanced AI capabilities to provide you with intelligent, personalized advice. What would you like to discuss today?",
+      timestamp: new Date(),
+    }
+    setMessages([defaultMessage])
+    localStorage.removeItem('projectAdvisorMessages')
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -282,9 +320,22 @@ const ProjectAdvisor = () => {
               </h1>
               <p style={styles.subtitle}>Get intelligent advice for your freelance project management challenges</p>
             </div>
-            <div style={styles.statusIndicator}>
-              <div style={styles.statusDot}></div>
-              <span style={styles.statusText}>Meta Llama AI Online</span>
+            <div style={styles.headerActions}>
+              <div style={styles.statusIndicator}>
+                <div style={styles.statusDot}></div>
+                <span style={styles.statusText}>Meta Llama AI Online</span>
+              </div>
+              {messages.length > 1 && (
+                <button 
+                  onClick={clearChatHistory} 
+                  style={styles.clearButton}
+                  className="clearButton"
+                  title="Clear chat history"
+                >
+                  <ClearIcon />
+                  Clear Chat
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -356,7 +407,7 @@ const ProjectAdvisor = () => {
               <h3 style={styles.quickQuestionsTitle}>Quick Questions</h3>
               <div style={styles.quickQuestionsList}>
                 {quickQuestions.map((question, index) => (
-                  <button key={index} onClick={() => handleQuickQuestion(question)} style={styles.quickQuestionButton}>
+                  <button key={index} onClick={() => handleQuickQuestion(question)} style={styles.quickQuestionButton} className="quickQuestionButton">
                     {question}
                   </button>
                 ))}
@@ -388,6 +439,10 @@ const ProjectAdvisor = () => {
               </button>
             </div>
             <p style={styles.inputHint}>Press Enter to send, Shift + Enter for new line</p>
+            <div style={styles.storageIndicator}>
+              <SaveIcon />
+              <span>Chat history saved locally</span>
+            </div>
           </div>
         </div>
       </div>
@@ -418,6 +473,21 @@ const SendIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M22 2L11 13" />
     <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+  </svg>
+)
+
+const ClearIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M18 6L6 18" />
+    <path d="M6 6l12 12" />
+  </svg>
+)
+
+const SaveIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+    <polyline points="17,21 17,13 7,13 7,21" />
+    <polyline points="7,3 7,8 15,8" />
   </svg>
 )
 
@@ -472,6 +542,11 @@ const styles = {
     fontSize: "16px",
     color: "#6b7280",
     margin: 0,
+  },
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
   },
   statusIndicator: {
     display: "flex",
@@ -650,6 +725,34 @@ const styles = {
     margin: "8px 0 0 0",
     textAlign: "center",
   },
+  clearButton: {
+    padding: "8px 16px",
+    backgroundColor: "transparent",
+    border: "none",
+    borderRadius: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "14px",
+    color: "#6B7280",
+    transition: "all 0.2s",
+    boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
+  },
+  storageIndicator: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "8px 16px",
+    backgroundColor: "#ECFDF5",
+    borderRadius: "20px",
+    border: "1px solid #A7F3D0",
+    marginTop: "8px",
+    fontSize: "12px",
+    color: "#059669",
+    fontWeight: "500",
+    justifyContent: "center",
+  },
 }
 
 // Add CSS animations
@@ -677,6 +780,18 @@ styleSheet.innerText = `
 
   .typing-dot:nth-child(3) {
     animation-delay: 0.4s;
+  }
+
+  .clearButton:hover {
+    background-color: #FEF2F2;
+    color: #DC2626;
+    transform: translateY(-1px);
+  }
+
+  .quickQuestionButton:hover {
+    background-color: #F3F4F6;
+    transform: translateY(-1px);
+    box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.1), -4px -4px 8px rgba(255, 255, 255, 0.9);
   }
 `
 document.head.appendChild(styleSheet)
