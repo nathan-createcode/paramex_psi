@@ -7,6 +7,7 @@ import Layout from "../components/Layout";
 import ProjectTable from "../components/project-man-comp/project-table";
 import SearchAndFilters from "../components/project-man-comp/search-filter";
 import { filterProjects, formatDate } from "../utils/project-utils";
+import { insertProjectAuto } from "../utils/simple-insert";
 import { ProjectForm } from "./project-form";
 import { Trash2, Pencil } from "lucide-react";
 
@@ -261,20 +262,28 @@ export default function ProjectManagementPage() {
                   throw new Error("Please fill in all required fields.");
                 }
                 // Insert ke Supabase
-                const { error } = await supabase.from("projects").insert([
-                  {
-                    user_id: userId,
-                    project_name: formData.name,
-                    client_name: formData.client,
-                    start_date: formData.startDate,
-                    deadline: formData.deadline,
-                    payment_amount: formData.payment,
-                    difficulty_level: formData.difficulty,
-                    type_id: formData.type,
-                    status_id: formData.status,
-                  },
-                ]);
-                if (error) throw error;
+                const projectData = {
+                  user_id: userId,
+                  project_name: formData.name,
+                  client_name: formData.client,
+                  start_date: formData.startDate,
+                  deadline: formData.deadline,
+                  payment_amount: formData.payment,
+                  difficulty_level: formData.difficulty,
+                  type_id: formData.type,
+                  status_id: formData.status,
+                };
+
+                console.log("Inserting project with simple method:", projectData);
+
+                // Use simple insert method - no SQL needed!
+                const result = await insertProjectAuto(projectData);
+                
+                if (!result.success) {
+                  throw new Error(result.error || "Failed to insert project");
+                }
+                
+                console.log("Successfully inserted project:", result.data);
                 setFormSuccess("Project successfully added!");
                 setShowProjectForm(false);
                 await fetchProjects(userId);

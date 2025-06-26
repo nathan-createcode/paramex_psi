@@ -11,7 +11,7 @@
  * @property {string} type
  * @property {string} payment
  * @property {'Low' | 'Medium' | 'High'} difficulty
- * @property {'On-Process' | 'On-Plan' | 'Completed'} status
+ * @property {'On-Process' | 'On-Plan' | 'Done'} status
  */
 
 /**
@@ -88,7 +88,7 @@ const checkDeadlineFilter = (project, deadlineFilter) => {
       return deadline >= nextMonth && deadline <= monthAfterNext;
 
     case 'Overdue':
-      return deadline < today && project.status !== 'Completed';
+      return deadline < today && project.status !== 'Done';
 
     default:
       return true;

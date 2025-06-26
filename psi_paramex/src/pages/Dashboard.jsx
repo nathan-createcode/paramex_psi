@@ -100,6 +100,25 @@ const chartOptions = {
   },
 }
 
+// Specific options for Project Types Chart (with enhanced tooltip)
+const typesChartOptions = {
+  ...chartOptions,
+  plugins: {
+    ...chartOptions.plugins,
+    tooltip: {
+      ...chartOptions.plugins.tooltip,
+      callbacks: {
+        label: (context) => {
+          return `${context.label}: ${context.parsed.y} projects`;
+        },
+        afterBody: () => {
+          return 'Filtered View: Shows only projects in selected time period';
+        },
+      },
+    },
+  },
+}
+
 // Icon Components dengan warna
 const BarChart3Icon = ({ color = "#3B82F6" }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
@@ -200,7 +219,11 @@ const Dashboard = () => {
 
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
-        .select("*")
+        .select(`
+          *,
+          type_id:type_id ( type_name ),
+          status_id:status_id ( status_name )
+        `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
 
@@ -209,8 +232,22 @@ const Dashboard = () => {
         throw projectsError
       }
 
-      console.log("Fetched projects:", projectsData)
-      setProjects(projectsData || [])
+      // Map the data to include status from status_id relation
+      const mappedProjects = (projectsData || []).map(project => ({
+        ...project,
+        status: project.status_id?.status_name || "unknown",
+        project_type: project.type_id?.type_name || "unknown"
+      }))
+
+      console.log("Raw database projects:", projectsData)
+      console.log("Mapped projects:", mappedProjects)
+      // Debug: Check what statuses and types are in the database
+      console.log("Project statuses:", mappedProjects?.map(p => p.status))
+      console.log("Unique statuses:", [...new Set(mappedProjects?.map(p => p.status))])
+      console.log("Project types:", mappedProjects?.map(p => p.project_type))
+      console.log("Unique project types:", [...new Set(mappedProjects?.map(p => p.project_type))])
+      
+      setProjects(mappedProjects)
     } catch (error) {
       console.error("Error fetching data:", error)
       setError(error.message)
@@ -221,13 +258,21 @@ const Dashboard = () => {
 
   // Calculate summary data
   const summary = useMemo(() => {
+    console.log("Calculating summary with projects:", projects.length)
+    
     const totalProjects = projects.length
-    const onPlan = projects.filter((p) => p.status === "on-plan").length
-    const onProcess = projects.filter((p) => p.status === "on-process").length
-    const completed = projects.filter((p) => p.status === "done").length
-    const totalEarnings = projects
-      .filter((p) => p.status === "done")
-      .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
+    const onPlan = projects.filter((p) => p.status === "On-Plan").length
+    const onProcess = projects.filter((p) => p.status === "On-Process").length
+    const done = projects.filter((p) => p.status === "Done").length
+    
+    console.log("Status counts:", { onPlan, onProcess, done })
+    
+          const doneProjects = projects.filter((p) => p.status === "Done")
+    console.log("Done projects:", doneProjects)
+    console.log("Done projects payment amounts:", doneProjects.map(p => p.payment_amount))
+    
+    const totalEarnings = doneProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0)
+    console.log("Total earnings:", totalEarnings)
 
     // Calculate this month's earnings
     const thisMonth = new Date()
@@ -235,16 +280,19 @@ const Dashboard = () => {
       .filter((p) => {
         const projectDate = new Date(p.created_at)
         return (
-          p.status === "done" &&
+          p.status === "Done" &&
           projectDate.getMonth() === thisMonth.getMonth() &&
           projectDate.getFullYear() === thisMonth.getFullYear()
         )
       })
       .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
 
+    console.log("Monthly earnings:", monthlyEarnings)
+
     return {
       totalProjects,
       onPlan,
+      onProcess,
       done,
       totalEarnings,
       monthlyEarnings,
@@ -270,8 +318,9 @@ const Dashboard = () => {
   // Generate breakdown data for tooltip
   const statusBreakdownData = useMemo(() => {
     const statusMap = {
-      "On-Plan": "on-plan",
-      Done: "done",
+      "On-Plan": "On-Plan",
+      "On-Process": "On-Process", 
+      "Done": "Done",
     }
 
     const breakdown = {}
@@ -281,7 +330,7 @@ const Dashboard = () => {
       const typeBreakdown = {}
 
       statusProjects.forEach((project) => {
-        const typeName = projectTypeMapping[project.project_type] || "Other"
+        const typeName = project.project_type || "Other"
         typeBreakdown[typeName] = (typeBreakdown[typeName] || 0) + 1
       })
 
@@ -334,18 +383,19 @@ const Dashboard = () => {
     [statusBreakdownData],
   )
 
-  // Generate chart data
-  const generateChartData = () => {
+  // Generate chart data - memoized for performance and reactive updates
+  const chartData = useMemo(() => {
     // Status distribution data (filtered)
     const statusData = {
-      labels: ["On-Plan", "Done"],
+      labels: ["On-Plan", "On-Process", "Done"],
       datasets: [
         {
           data: [
-            filteredProjects.filter((p) => p.status === "on-plan").length,
-            filteredProjects.filter((p) => p.status === "done").length,
+            filteredProjects.filter((p) => p.status === "On-Plan").length,
+            filteredProjects.filter((p) => p.status === "On-Process").length,
+            filteredProjects.filter((p) => p.status === "Done").length,
           ],
-          backgroundColor: ["#3B82F6", "#10B981"],
+                      backgroundColor: ["#3B82F6", "#EAB308", "#10B981"],
           borderWidth: 0,
           hoverOffset: 4,
         },
@@ -354,37 +404,55 @@ const Dashboard = () => {
 
     // Project types data (filtered)
     const typeMap = new Map()
-    Object.keys(projectTypeMapping).forEach((typeId) => {
-      typeMap.set(Number.parseInt(typeId), { count: 0, earnings: 0 })
+    
+    // Get unique project types from filtered data (for current view)
+    const uniqueTypes = [...new Set(filteredProjects.map(p => p.project_type).filter(Boolean))]
+    
+    console.log('Filtered projects count:', filteredProjects.length)
+    console.log('Unique types from filtered data:', uniqueTypes)
+    
+    uniqueTypes.forEach((typeName) => {
+      typeMap.set(typeName, { count: 0, earnings: 0 })
     })
 
-    filteredProjects.forEach((project) => {
-      const typeId = Number.parseInt(project.project_type) || 1
-      const current = typeMap.get(typeId) || { count: 0, earnings: 0 }
+    // Debug: Show detailed project type breakdown
+    console.log('Filtered projects with types:', filteredProjects.map(p => ({
+      name: p.project_name,
+      type: p.project_type,
+      status: p.status,
+      created_at: p.created_at
+    })))
 
-      typeMap.set(typeId, {
+    filteredProjects.forEach((project) => {
+      const typeName = project.project_type || "Unknown"
+      const current = typeMap.get(typeName) || { count: 0, earnings: 0 }
+
+      typeMap.set(typeName, {
         count: current.count + 1,
-        earnings: current.earnings + (project.status === "done" ? project.payment_amount || 0 : 0),
+        earnings: current.earnings + ((project.status === "Done") ? project.payment_amount || 0 : 0),
       })
     })
 
-    const projectTypeData = Array.from(typeMap.entries()).map(([typeId, data]) => ({
-      type: projectTypeMapping[typeId],
+    const projectTypeData = Array.from(typeMap.entries()).map(([typeName, data]) => ({
+      type: typeName,
       count: data.count,
       earnings: data.earnings,
     }))
 
+    console.log('Project type breakdown:', projectTypeData)
+
+    // Create colors array for project types (consistent with trendsData)
+    const defaultColors = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EF4444", "#6B7280"]
+
     const typesData = {
-      labels: projectTypeData.map((d) => d.type),
-      datasets: [
-        {
-          label: "Projects Count",
-          data: projectTypeData.map((d) => d.count),
-          backgroundColor: Object.values(projectTypeColors),
-          borderRadius: 8,
-          borderSkipped: false,
-        },
-      ],
+      labels: ["Count"],
+      datasets: projectTypeData.map((typeData, index) => ({
+        label: typeData.type,
+        data: [typeData.count],
+        backgroundColor: defaultColors[index % defaultColors.length],
+        borderRadius: 8,
+        borderSkipped: false,
+      })),
     }
 
     // Monthly trends (last 6 months) - Global
@@ -396,6 +464,12 @@ const Dashboard = () => {
       }
     })
 
+    // Get all unique types from global projects for trends (global view)
+    const allUniqueTypes = [...new Set(projects.map(p => p.project_type).filter(Boolean))]
+    
+    console.log('All projects count:', projects.length)
+    console.log('All unique types for trends:', allUniqueTypes)
+
     const monthlyTrendData = last6Months.map(({ month, date }) => {
       const monthProjects = projects.filter((project) => {
         const projectDate = new Date(project.created_at)
@@ -405,11 +479,11 @@ const Dashboard = () => {
         })
       })
 
-      // Count completed projects by type
+      // Count done projects by type
       const typeData = {}
-      Object.keys(projectTypeMapping).forEach((typeId) => {
-        typeData[typeId] = monthProjects.filter(
-          (p) => Number.parseInt(p.project_type) === Number.parseInt(typeId) && p.status === "done",
+      allUniqueTypes.forEach((typeName) => {
+        typeData[typeName] = monthProjects.filter(
+          (p) => p.project_type === typeName && p.status === "Done",
         ).length
       })
 
@@ -421,11 +495,11 @@ const Dashboard = () => {
 
     const trendsData = {
       labels: monthlyTrendData.map((d) => d.month),
-      datasets: Object.keys(projectTypeMapping).map((typeId) => ({
-        label: projectTypeMapping[typeId],
-        data: monthlyTrendData.map((d) => d[typeId] || 0),
-        borderColor: projectTypeColors[typeId],
-        backgroundColor: `${projectTypeColors[typeId]}20`,
+      datasets: allUniqueTypes.map((typeName, index) => ({
+        label: typeName,
+        data: monthlyTrendData.map((d) => d[typeName] || 0),
+        borderColor: defaultColors[index % defaultColors.length],
+        backgroundColor: `${defaultColors[index % defaultColors.length]}20`,
         tension: 0.4,
         fill: false,
       })),
@@ -441,7 +515,7 @@ const Dashboard = () => {
         })
       })
 
-      const completedProjects = monthProjects.filter((p) => p.status === "done")
+      const completedProjects = monthProjects.filter((p) => p.status === "Done")
 
       return {
         month,
@@ -464,7 +538,7 @@ const Dashboard = () => {
     }
 
     return { statusData, typesData, trendsData, earningsData }
-  }
+  }, [filteredProjects, projects, timeFilter]) // Dependencies for useMemo
 
   if (loading) {
     return (
@@ -494,7 +568,7 @@ const Dashboard = () => {
     )
   }
 
-  const { statusData, typesData, trendsData, earningsData } = generateChartData()
+  const { statusData, typesData, trendsData, earningsData } = chartData
 
   return (
     <Layout>
@@ -508,6 +582,10 @@ const Dashboard = () => {
               {summary.totalProjects} projects
             </span>
             ,{" "}
+            <span className="font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
+              {summary.onProcess} in progress
+            </span>
+            , and earned{" "}
             <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
               ${summary.monthlyEarnings.toLocaleString()} this month
             </span>
@@ -516,7 +594,7 @@ const Dashboard = () => {
         </div>
 
         {/* Summary Cards - 6 Cards seperti di gambar */}
-        <div className="grid grid-cols-6 xl:grid-cols-6 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4 mb-8">
+        <div className="grid grid-cols-5 xl:grid-cols-5 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4 mb-8">
           {[
             {
               title: "Total Projects",
@@ -533,7 +611,14 @@ const Dashboard = () => {
               bgColor: "bg-blue-50",
             },
             {
-              title: "Completed",
+              title: "On-Process",
+              value: summary.onProcess.toString(),
+              icon: TrendingUpIcon,
+              iconColor: "#EAB308",
+              bgColor: "bg-yellow-50",
+            },
+            {
+              title: "Done",
               value: summary.done.toString(),
               icon: CheckCircleIcon,
               iconColor: "#10B981",
@@ -607,7 +692,7 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="h-64 relative">
-                <Bar data={typesData} options={chartOptions} />
+                <Bar data={typesData} options={typesChartOptions} />
               </div>
             </div>
           </div>

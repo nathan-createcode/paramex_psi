@@ -69,7 +69,11 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
       try {
         const { data, error } = await supabase.from("project_status").select("*");
         if (error) throw error;
-        setStatusOptions(data || []);
+        // Filter out "On-Discuss" status
+        const filteredStatuses = (data || []).filter(status => 
+          status.status_name?.toLowerCase() !== 'on-discuss'
+        );
+        setStatusOptions(filteredStatuses);
       } catch {
         setStatusError("Failed to load project statuses");
       } finally {
@@ -88,7 +92,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "payment" ? parseFloat(value) || 0 : value,
+      [name]: name === "payment" ? parseFloat(value) || null : value,
     }));
   };
 
