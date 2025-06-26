@@ -11,7 +11,7 @@ const ProjectAdvisor = () => {
       id: 1,
       type: "ai",
       content:
-        "Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization. What would you like to discuss today?",
+                        "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I'm connected to advanced AI capabilities to provide you with intelligent, personalized advice. What would you like to discuss today?",
       timestamp: new Date(),
     },
   ])
@@ -56,20 +56,30 @@ const ProjectAdvisor = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // Simulate AI response
-  const generateAIResponse = () => {
-    const responses = [
-      "Based on your project requirements, I recommend breaking down the task into smaller, manageable chunks. This approach will help you maintain momentum and track progress more effectively.",
-      "For better project prioritization, consider using the Eisenhower Matrix: categorize tasks by urgency and importance. Focus on important and urgent tasks first.",
-      "Time management tip: Try the Pomodoro Technique - work for 25 minutes, then take a 5-minute break. This can significantly improve your focus and productivity.",
-      "When dealing with difficult clients, clear communication is key. Set expectations early, provide regular updates, and document all agreements in writing.",
-      "For project estimation, use the three-point estimation method: calculate optimistic, pessimistic, and most likely scenarios, then use the weighted average.",
-      "Consider implementing a project buffer - add 20-30% extra time to your estimates to account for unexpected challenges and scope changes.",
-      "Regular project reviews are crucial. Schedule weekly check-ins to assess progress, identify blockers, and adjust timelines as needed.",
-      "To improve client satisfaction, provide value beyond the basic requirements. Small extras and proactive communication can lead to repeat business and referrals.",
-    ]
+  // Call Groq AI API for real AI responses
+  const generateAIResponse = async (userMessage, conversationHistory) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          conversation_history: conversationHistory
+        })
+      })
 
-    return responses[Math.floor(Math.random() * responses.length)]
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data.response
+    } catch (error) {
+      console.error('Error calling AI API:', error)
+      return "I apologize, but I'm currently unable to connect to my AI brain. Please check that the backend server is running and try again. In the meantime, I recommend breaking your project into smaller, manageable tasks for better organization."
+    }
   }
 
   const handleSendMessage = async () => {
@@ -83,24 +93,34 @@ const ProjectAdvisor = () => {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const messageText = inputMessage.trim()
     setInputMessage("")
     setIsTyping(true)
 
-    // Simulate AI thinking time
-    setTimeout(
-      () => {
-        const aiResponse = {
-          id: Date.now() + 1,
-          type: "ai",
-          content: generateAIResponse(),
-          timestamp: new Date(),
-        }
+    try {
+      // Get AI response from Groq API
+      const aiResponseContent = await generateAIResponse(messageText, messages)
+      
+      const aiResponse = {
+        id: Date.now() + 1,
+        type: "ai",
+        content: aiResponseContent,
+        timestamp: new Date(),
+      }
 
-        setMessages((prev) => [...prev, aiResponse])
-        setIsTyping(false)
-      },
-      1500 + Math.random() * 1000,
-    ) // Random delay between 1.5-2.5 seconds
+      setMessages((prev) => [...prev, aiResponse])
+    } catch (error) {
+      console.error('Error getting AI response:', error)
+      const errorResponse = {
+        id: Date.now() + 1,
+        type: "ai",
+        content: "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorResponse])
+    } finally {
+      setIsTyping(false)
+    }
   }
 
   const handleKeyPress = (e) => {
@@ -119,8 +139,42 @@ const ProjectAdvisor = () => {
     "Best practices for freelance project management?",
   ]
 
-  const handleQuickQuestion = (question) => {
-    setInputMessage(question)
+  const handleQuickQuestion = async (question) => {
+    // Immediately send the quick question
+    const userMessage = {
+      id: Date.now(),
+      type: "user",
+      content: question,
+      timestamp: new Date(),
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setIsTyping(true)
+
+    try {
+      // Get AI response for quick question
+      const aiResponseContent = await generateAIResponse(question, messages)
+      
+      const aiResponse = {
+        id: Date.now() + 1,
+        type: "ai",
+        content: aiResponseContent,
+        timestamp: new Date(),
+      }
+
+      setMessages((prev) => [...prev, aiResponse])
+    } catch (error) {
+      console.error('Error getting AI response for quick question:', error)
+      const errorResponse = {
+        id: Date.now() + 1,
+        type: "ai",
+        content: "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorResponse])
+    } finally {
+      setIsTyping(false)
+    }
   }
 
   if (loading) {
@@ -149,7 +203,7 @@ const ProjectAdvisor = () => {
             </div>
             <div style={styles.statusIndicator}>
               <div style={styles.statusDot}></div>
-              <span style={styles.statusText}>AI Online</span>
+              <span style={styles.statusText}>Meta Llama AI Online</span>
             </div>
           </div>
         </div>
