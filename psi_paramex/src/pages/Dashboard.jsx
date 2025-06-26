@@ -133,6 +133,17 @@ const typesChartOptions = {
   },
 }
 
+// Specific options for Earnings Chart (without legend)
+const earningsChartOptions = {
+  ...chartOptions,
+  plugins: {
+    ...chartOptions.plugins,
+    legend: {
+      display: false, // Hide legend for earnings chart
+    },
+  },
+}
+
 // Icon Components dengan warna
 const BarChart3Icon = ({ color = "#3B82F6" }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
@@ -744,7 +755,7 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="h-64 relative">
-                <Line data={earningsData} options={chartOptions} />
+                <Line data={earningsData} options={earningsChartOptions} />
               </div>
             </div>
           </div>
