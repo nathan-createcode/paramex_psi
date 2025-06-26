@@ -224,7 +224,6 @@ const Dashboard = () => {
     const totalProjects = projects.length
     const onPlan = projects.filter((p) => p.status === "on-plan").length
     const onProcess = projects.filter((p) => p.status === "on-process").length
-    const onDiscuss = projects.filter((p) => p.status === "on-discuss").length
     const completed = projects.filter((p) => p.status === "done").length
     const totalEarnings = projects
       .filter((p) => p.status === "done")
@@ -246,9 +245,7 @@ const Dashboard = () => {
     return {
       totalProjects,
       onPlan,
-      onProcess,
-      onDiscuss,
-      completed,
+      done,
       totalEarnings,
       monthlyEarnings,
     }
@@ -274,8 +271,6 @@ const Dashboard = () => {
   const statusBreakdownData = useMemo(() => {
     const statusMap = {
       "On-Plan": "on-plan",
-      "On-Process": "on-process",
-      "On-Discuss": "on-discuss",
       Done: "done",
     }
 
@@ -343,16 +338,14 @@ const Dashboard = () => {
   const generateChartData = () => {
     // Status distribution data (filtered)
     const statusData = {
-      labels: ["On-Plan", "On-Process", "On-Discuss", "Done"],
+      labels: ["On-Plan", "Done"],
       datasets: [
         {
           data: [
             filteredProjects.filter((p) => p.status === "on-plan").length,
-            filteredProjects.filter((p) => p.status === "on-process").length,
-            filteredProjects.filter((p) => p.status === "on-discuss").length,
             filteredProjects.filter((p) => p.status === "done").length,
           ],
-          backgroundColor: ["#3B82F6", "#EAB308", "#A855F7", "#10B981"],
+          backgroundColor: ["#3B82F6", "#10B981"],
           borderWidth: 0,
           hoverOffset: 4,
         },
@@ -515,10 +508,6 @@ const Dashboard = () => {
               {summary.totalProjects} projects
             </span>
             ,{" "}
-            <span className="font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
-              {summary.onProcess} in progress
-            </span>
-            , and earned{" "}
             <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
               ${summary.monthlyEarnings.toLocaleString()} this month
             </span>
@@ -544,22 +533,8 @@ const Dashboard = () => {
               bgColor: "bg-blue-50",
             },
             {
-              title: "On-Process",
-              value: summary.onProcess.toString(),
-              icon: TrendingUpIcon,
-              iconColor: "#EAB308",
-              bgColor: "bg-yellow-50",
-            },
-            {
-              title: "On-Discuss",
-              value: summary.onDiscuss.toString(),
-              icon: MessageSquareIcon,
-              iconColor: "#A855F7",
-              bgColor: "bg-purple-50",
-            },
-            {
               title: "Completed",
-              value: summary.completed.toString(),
+              value: summary.done.toString(),
               icon: CheckCircleIcon,
               iconColor: "#10B981",
               bgColor: "bg-green-50",

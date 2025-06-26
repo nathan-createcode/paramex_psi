@@ -7,6 +7,7 @@ import {
   Briefcase,
   Clock,
   BarChart3,
+  Circle,
 } from "lucide-react";
 import { supabase } from "../supabase/supabase";
 
@@ -89,6 +90,45 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
       ...prev,
       [name]: name === "payment" ? parseFloat(value) || 0 : value,
     }));
+  };
+
+  const getStatusColor = (statusName) => {
+    switch (statusName?.toLowerCase()) {
+      case 'on-process':
+        return 'text-yellow-600';
+      case 'on-plan':
+        return 'text-blue-600';
+      case 'done':
+        return 'text-green-600';
+      default:
+        return 'text-gray-600';
+    }
+  };
+
+  const getStatusBgColor = (statusName) => {
+    switch (statusName?.toLowerCase()) {
+      case 'on-process':
+        return 'bg-yellow-100';
+      case 'on-plan':
+        return 'bg-blue-100';
+      case 'done':
+        return 'bg-green-100';
+      default:
+        return 'bg-gray-100';
+    }
+  };
+
+  const getStatusDotColor = (statusName) => {
+    switch (statusName?.toLowerCase()) {
+      case 'on-process':
+        return 'text-yellow-500';
+      case 'on-plan':
+        return 'text-blue-500';
+      case 'done':
+        return 'text-green-500';
+      default:
+        return 'text-gray-400';
+    }
   };
 
   return (
@@ -264,25 +304,29 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                     Status
                   </label>
                   <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <Circle className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${getStatusDotColor(formData.status ? statusOptions.find(s => s.status_id === formData.status)?.status_name : null)}`} />
                     <select
                       name="status"
                       value={formData.status}
                       onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white ${formData.status ? getStatusColor(statusOptions.find(s => s.status_id === formData.status)?.status_name) : ''}`}
                       required
                       disabled={statusLoading || !!statusError}
                     >
-                      <option value="">
+                      <option value="" className="text-gray-600">
                         {statusLoading ? "Loading statuses..." : "Select Project status"}
                       </option>
                       {statusError && (
-                        <option value="" disabled>
+                        <option value="" disabled className="text-red-600">
                           {statusError}
                         </option>
                       )}
                       {statusOptions.map((status) => (
-                        <option key={status.status_id} value={status.status_id}>
+                        <option 
+                          key={status.status_id} 
+                          value={status.status_id}
+                          className={`${getStatusColor(status.status_name)} ${getStatusBgColor(status.status_name)}`}
+                        >
                           {status.status_name}
                         </option>
                       ))}

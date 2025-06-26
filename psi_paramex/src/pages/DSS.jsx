@@ -218,7 +218,7 @@ const DSS = () => {
                   <option value="all">All Active Projects</option>
                   <option value="on-plan">On-Plan Projects</option>
                   <option value="on-process">On-Process Projects</option>
-                  <option value="on-discuss">On-Discuss Projects</option>
+                  <option value="done">Done Projects</option>
                 </select>
               </div>
 
