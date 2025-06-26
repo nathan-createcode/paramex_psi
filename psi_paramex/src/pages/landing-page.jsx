@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import FeatureCard from "../components/feature-card"
 import { GridIcon, ClockIcon, MapPinIcon } from "../components/icons"
+import gambarLandingPage from "../assets/landing_page_img.png";
 
 const LandingPage = () => {
   const [email, setEmail] = useState("")
@@ -85,44 +86,43 @@ const LandingPage = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-16 md:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-800 leading-tight mb-6">
-              Manage your freelance projects smarter with MIS, DSS & AI
-            </h1>
-            <p className="text-lg text-gray-600 mb-8">
-              Streamline your workflow, prioritize tasks intelligently, and make data-driven decisions with our
-              AI-powered project management platform designed specifically for freelancers.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Link
-                to="/register"
-                className="px-6 py-3 rounded-full bg-black text-white hover:bg-gray-800 transition-all font-medium shadow-sm hover:shadow-md"
-              >
-                Get Started
-              </Link>
-              <Link
-                to="/about"
-                className="px-6 py-3 rounded-full bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 transition-all font-medium shadow-sm hover:shadow-md"
-              >
-                Learn More
-              </Link>
-            </div>
-          </div>
-          <div className="flex justify-center">
-            <div className="relative w-full max-w-md aspect-square p-8 border border-gray-100 rounded-3xl shadow-sm">
-              <img
-                src="/placeholder.svg?height=400&width=400"
-                alt="AI-powered project management"
-                width="400"
-                height="400"
-                className="object-contain w-full h-full"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+<section className="container mx-auto px-4 py-16 md:py-24">
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+    <div className="pl-8"> 
+      <h1 className="text-4xl md:text-5xl font-bold text-gray-800 leading-tight mb-6">
+        Manage your freelance projects smarter with MIS, DSS & AI
+      </h1>
+      <p className="text-lg text-gray-600 mb-8">
+        Streamline your workflow, prioritize tasks intelligently, and make data-driven decisions with our
+        AI-powered project management platform designed specifically for freelancers.
+      </p>
+      <div className="flex flex-wrap gap-4">
+        <Link
+          to="/register"
+          className="px-6 py-3 rounded-full bg-black text-white hover:bg-gray-800 transition-all font-medium shadow-sm hover:shadow-md"
+        >
+          Get Started
+        </Link>
+        <Link
+          to="/about"
+          className="px-6 py-3 rounded-full bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 transition-all font-medium shadow-sm hover:shadow-md"
+        >
+          Learn More
+        </Link>
+      </div>
+    </div>
+    <div className="flex justify-center">
+      <div className="relative w-full max-w-md aspect-square p-8 border border-gray-100 rounded-3xl shadow-sm">
+        <img
+          src={gambarLandingPage}
+          alt="Login Illustration"
+          className="w-[100%] h-auto object-contain"
+        />
+      </div>
+    </div>
+  </div>
+</section>
+
 
       {/* Features Section */}
       <section className="container mx-auto px-4 py-16">
