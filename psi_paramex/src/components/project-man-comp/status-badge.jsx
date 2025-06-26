@@ -2,6 +2,19 @@ import React from 'react';
 
 export default function StatusBadge({ status, type = 'status' }) {
   const getStatusStyles = () => {
+    if (type === 'difficulty') {
+      switch (status.toLowerCase()) {
+        case 'low':
+          return 'text-green-600';
+        case 'medium':
+          return 'text-yellow-600';
+        case 'high':
+          return 'text-red-600';
+        default:
+          return 'text-gray-600';
+      }
+    }
+
     if (type === 'project-type') {
       switch (status.toLowerCase()) {
         case 'website':
@@ -32,6 +45,15 @@ export default function StatusBadge({ status, type = 'status' }) {
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
+
+  // For difficulty type, render without badge styling
+  if (type === 'difficulty') {
+    return (
+      <span className={`text-sm font-medium ${getStatusStyles()}`}>
+        {status}
+      </span>
+    );
+  }
 
   return (
     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusStyles()}`}>

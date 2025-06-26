@@ -39,6 +39,10 @@ export default function ProjectManagementPage() {
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: 'asc'
+  });
 
   // Check authentication and fetch projects
   useEffect(() => {
@@ -113,9 +117,64 @@ export default function ProjectManagementPage() {
     }
   };
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   const filteredProjects = useMemo(() => {
-    return filterProjects(projects, searchQuery, filters);
-  }, [projects, searchQuery, filters]);
+    const filtered = filterProjects(projects, searchQuery, filters);
+    
+    // Apply sorting if sortConfig is set
+    if (sortConfig.key) {
+      const sorted = [...filtered].sort((a, b) => {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+        
+        // Handle null or undefined values
+        if (aValue == null && bValue == null) return 0;
+        if (aValue == null) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (bValue == null) return sortConfig.direction === 'asc' ? 1 : -1;
+        
+        // Handle date sorting (for startDate and deadline)
+        if (sortConfig.key === 'startDate' || sortConfig.key === 'deadline') {
+          const dateA = new Date(aValue);
+          const dateB = new Date(bValue);
+          const comparison = dateA.getTime() - dateB.getTime();
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        // Handle numeric sorting (for payment)
+        if (sortConfig.key === 'payment') {
+          const numA = parseFloat(aValue) || 0;
+          const numB = parseFloat(bValue) || 0;
+          const comparison = numA - numB;
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        // Handle string comparison (for name, client, type, difficulty, status)
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          const comparison = aValue.toLowerCase().localeCompare(bValue.toLowerCase());
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        // Fallback comparison
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+      return sorted;
+    }
+    
+    return filtered;
+  }, [projects, searchQuery, filters, sortConfig]);
 
   const displayProjects = filteredProjects.map((project) => ({
     ...project,
@@ -191,36 +250,8 @@ export default function ProjectManagementPage() {
 
           <ProjectTable
             projects={displayProjects}
-            // onRowClick={async (project) => {
-            //   setEditFormLoading(true);
-            //   setEditProjectId(project.id);
-            //   setShowEditForm(true);
-            //   setEditProjectData(null);
-            //   try {
-            //     // Fetch latest project data by ID from Supabase
-            //     const { data, error } = await supabase
-            //       .from("projects")
-            //       .select("*")
-            //       .eq("project_id", project.id)
-            //       .single();
-            //     if (error) throw error;
-            //     setEditProjectData({
-            //       id: data.project_id,
-            //       name: data.project_name,
-            //       client: data.client_name,
-            //       startDate: data.start_date,
-            //       deadline: data.deadline,
-            //       payment: data.payment_amount,
-            //       difficulty: data.difficulty_level,
-            //       type: data.type_id,
-            //     });
-            //   } catch {
-            //     setFormError("Failed to load project data for editing.");
-            //     setShowEditForm(false);
-            //   } finally {
-            //     setEditFormLoading(false);
-            //   }
-            // }}
+            sortConfig={sortConfig}
+            onSort={handleSort}
             onContextAction={(project, position) => {
               setContextMenu({
                 visible: true,
@@ -254,7 +285,7 @@ export default function ProjectManagementPage() {
                   !formData.client ||
                   !formData.startDate ||
                   !formData.deadline ||
-                  !formData.payment === "" ||
+                  formData.payment === "" ||
                   !formData.difficulty ||
                   !formData.type ||
                   !formData.status

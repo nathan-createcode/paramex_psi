@@ -17,7 +17,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     client: "",
     startDate: "",
     deadline: "",
-    payment: 0,
+    payment: "",
     difficulty: "",
     type: "",
     status: "",
@@ -36,7 +36,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
         client: initialData.client || "",
         startDate: initialData.startDate || "",
         deadline: initialData.deadline || "",
-        payment: initialData.payment ?? 0,
+        payment: initialData.payment || "",
         difficulty: initialData.difficulty || "",
         type: initialData.type || "",
         status: initialData.status || "",
@@ -88,38 +88,39 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     await onSubmit(formData);
   };
 
+  const formatCurrency = (value) => {
+    if (!value) return "";
+    // Remove any non-numeric characters except digits
+    let numericValue = value.toString().replace(/[^\d]/g, "");
+    
+    // Limit to maximum 15 digits to prevent precision issues
+    if (numericValue.length > 15) {
+      numericValue = numericValue.slice(0, 15);
+    }
+    
+    // Format with dot as thousand separator
+    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const parseCurrency = (value) => {
+    if (!value) return "";
+    // Remove dots (thousand separators) and keep only digits
+    let numericValue = value.toString().replace(/\./g, "").replace(/[^\d]/g, "");
+    
+    // Limit to maximum 15 digits
+    if (numericValue.length > 15) {
+      numericValue = numericValue.slice(0, 15);
+    }
+    
+    return numericValue === "" ? "" : numericValue;
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "payment" ? parseFloat(value) || null : value,
+      [name]: name === "payment" ? parseCurrency(value) : value,
     }));
-  };
-
-  const getStatusColor = (statusName) => {
-    switch (statusName?.toLowerCase()) {
-      case 'on-process':
-        return 'text-yellow-600';
-      case 'on-plan':
-        return 'text-blue-600';
-      case 'done':
-        return 'text-green-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
-
-  const getStatusBgColor = (statusName) => {
-    switch (statusName?.toLowerCase()) {
-      case 'on-process':
-        return 'bg-yellow-100';
-      case 'on-plan':
-        return 'bg-blue-100';
-      case 'done':
-        return 'bg-green-100';
-      default:
-        return 'bg-gray-100';
-    }
   };
 
   const getStatusDotColor = (statusName) => {
@@ -133,6 +134,31 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
       default:
         return 'text-gray-400';
     }
+  };
+
+  const getDifficultyDotColor = (difficulty) => {
+    switch (difficulty?.toLowerCase()) {
+      case 'low':
+        return 'text-green-500';
+      case 'medium':
+        return 'text-yellow-500';
+      case 'high':
+        return 'text-red-500';
+      default:
+        return 'text-gray-400';
+    }
+  };
+
+  const getTypeDotColor = (typeId) => {
+    const colors = [
+      'text-purple-500',
+      'text-indigo-500', 
+      'text-pink-500',
+      'text-teal-500',
+      'text-orange-500',
+      'text-cyan-500'
+    ];
+    return colors[typeId % colors.length] || 'text-gray-400';
   };
 
   return (
@@ -240,9 +266,9 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
-                      type="number"
+                      type="text"
                       name="payment"
-                      value={formData.payment}
+                      value={formatCurrency(formData.payment)}
                       onChange={handleChange}
                       placeholder="Enter Payment Amount"
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -264,7 +290,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                       required
                     >
-                      <option>Select difficulty</option>
+                      <option value="">Select difficulty</option>
                       <option value="Low">Low</option>
                       <option value="Medium">Medium</option>
                       <option value="High">High</option>
@@ -295,7 +321,10 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                         </option>
                       )}
                       {typeOptions.map((type) => (
-                        <option key={type.type_id} value={type.type_id}>
+                        <option 
+                          key={type.type_id} 
+                          value={type.type_id}
+                        >
                           {type.type_name}
                         </option>
                       ))}
@@ -308,20 +337,20 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                     Status
                   </label>
                   <div className="relative">
-                    <Circle className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${getStatusDotColor(formData.status ? statusOptions.find(s => s.status_id === formData.status)?.status_name : null)}`} />
+                    <Circle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <select
                       name="status"
                       value={formData.status}
                       onChange={handleChange}
-                      className={`w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white ${formData.status ? getStatusColor(statusOptions.find(s => s.status_id === formData.status)?.status_name) : ''}`}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                       required
                       disabled={statusLoading || !!statusError}
                     >
-                      <option value="" className="text-gray-600">
+                      <option value="">
                         {statusLoading ? "Loading statuses..." : "Select Project status"}
                       </option>
                       {statusError && (
-                        <option value="" disabled className="text-red-600">
+                        <option value="" disabled>
                           {statusError}
                         </option>
                       )}
@@ -329,7 +358,6 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                         <option 
                           key={status.status_id} 
                           value={status.status_id}
-                          className={`${getStatusColor(status.status_name)} ${getStatusBgColor(status.status_name)}`}
                         >
                           {status.status_name}
                         </option>
@@ -342,16 +370,9 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
               {/* Form Actions */}
               <div className="flex gap-3 pt-6">
                 <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
