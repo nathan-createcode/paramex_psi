@@ -18,6 +18,86 @@ const DSS = () => {
   const [priorityResults, setPriorityResults] = useState([])
   const navigate = useNavigate()
 
+  // Add custom CSS for sliders
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      .deadline-slider::-webkit-slider-thumb,
+      .payment-slider::-webkit-slider-thumb,
+      .difficulty-slider::-webkit-slider-thumb {
+        appearance: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #F9FAFB;
+        border: 2px solid #D1D5DB;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .deadline-slider::-webkit-slider-thumb:hover,
+      .payment-slider::-webkit-slider-thumb:hover,
+      .difficulty-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+      }
+      .deadline-slider::-webkit-slider-thumb:active,
+      .payment-slider::-webkit-slider-thumb:active,
+      .difficulty-slider::-webkit-slider-thumb:active {
+        transform: scale(0.95);
+      }
+
+      /* Firefox slider thumb */
+      .deadline-slider::-moz-range-thumb,
+      .payment-slider::-moz-range-thumb,
+      .difficulty-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .deadline-slider::-moz-range-thumb,
+      .payment-slider::-moz-range-thumb,
+      .difficulty-slider::-moz-range-thumb {
+        background: #F9FAFB;
+        border: 2px solid #D1D5DB;
+      }
+
+      /* Slider track styling */
+      .deadline-slider::-webkit-slider-track,
+      .payment-slider::-webkit-slider-track,
+      .difficulty-slider::-webkit-slider-track {
+        height: 8px;
+        border-radius: 10px;
+        outline: none;
+      }
+
+      .deadline-slider:hover,
+      .payment-slider:hover,
+      .difficulty-slider:hover {
+        opacity: 0.8;
+      }
+
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+      }
+
+      .deadline-slider:focus,
+      .payment-slider:focus,
+      .difficulty-slider:focus {
+        animation: pulse 2s ease-in-out infinite;
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      document.head.removeChild(style)
+    }
+  }, [])
+
   // Authentication check
   useEffect(() => {
     const checkAuth = async () => {
@@ -177,7 +257,12 @@ const DSS = () => {
                 <div style={styles.weightGroup}>
                   <div style={styles.weightHeader}>
                     <label style={styles.weightLabel}>Deadline Weight</label>
-                    <span style={styles.weightValue}>{weights.deadline}%</span>
+                    <span style={{
+                      ...styles.weightValue,
+                      background: "linear-gradient(135deg, #495057, #343A40)",
+                      backgroundColor: "transparent",
+                      border: "none",
+                    }}>{weights.deadline}%</span>
                   </div>
                   <input
                     type="range"
@@ -186,7 +271,11 @@ const DSS = () => {
                     step="5"
                     value={weights.deadline}
                     onChange={(e) => handleWeightChange("deadline", [Number.parseInt(e.target.value)])}
-                    style={styles.slider}
+                    style={{
+                      ...styles.slider,
+                      ...styles.sliderDeadline,
+                    }}
+                    className="deadline-slider"
                   />
                 </div>
 
@@ -194,7 +283,12 @@ const DSS = () => {
                 <div style={styles.weightGroup}>
                   <div style={styles.weightHeader}>
                     <label style={styles.weightLabel}>Payment Weight</label>
-                    <span style={styles.weightValue}>{weights.payment}%</span>
+                    <span style={{
+                      ...styles.weightValue,
+                      background: "linear-gradient(135deg, #495057, #343A40)",
+                      backgroundColor: "transparent",
+                      border: "none",
+                    }}>{weights.payment}%</span>
                   </div>
                   <input
                     type="range"
@@ -203,7 +297,11 @@ const DSS = () => {
                     step="5"
                     value={weights.payment}
                     onChange={(e) => handleWeightChange("payment", [Number.parseInt(e.target.value)])}
-                    style={styles.slider}
+                    style={{
+                      ...styles.slider,
+                      ...styles.sliderPayment,
+                    }}
+                    className="payment-slider"
                   />
                 </div>
 
@@ -211,7 +309,12 @@ const DSS = () => {
                 <div style={styles.weightGroup}>
                   <div style={styles.weightHeader}>
                     <label style={styles.weightLabel}>Difficulty Weight</label>
-                    <span style={styles.weightValue}>{weights.difficulty}%</span>
+                    <span style={{
+                      ...styles.weightValue,
+                      background: "linear-gradient(135deg, #495057, #343A40)",
+                      backgroundColor: "transparent",
+                      border: "none",
+                    }}>{weights.difficulty}%</span>
                   </div>
                   <input
                     type="range"
@@ -220,7 +323,11 @@ const DSS = () => {
                     step="5"
                     value={weights.difficulty}
                     onChange={(e) => handleWeightChange("difficulty", [Number.parseInt(e.target.value)])}
-                    style={styles.slider}
+                    style={{
+                      ...styles.slider,
+                      ...styles.sliderDifficulty,
+                    }}
+                    className="difficulty-slider"
                   />
                 </div>
               </div>
@@ -523,16 +630,51 @@ const styles = {
   },
   weightValue: {
     fontSize: "14px",
-    fontWeight: "600",
-    color: "#3B82F6",
+    fontWeight: "700",
+    background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+    padding: "0",
+    borderRadius: "0",
+    backgroundColor: "transparent",
+    border: "none",
+    minWidth: "auto",
+    textAlign: "right",
+    display: "inline-block",
   },
   slider: {
     width: "100%",
-    height: "6px",
-    borderRadius: "3px",
+    height: "8px",
+    borderRadius: "10px",
     background: "#E5E7EB",
     outline: "none",
     cursor: "pointer",
+    appearance: "none",
+    WebkitAppearance: "none",
+    transition: "all 0.3s ease",
+    position: "relative",
+  },
+  sliderDeadline: {
+    background: "#E5E7EB",
+  },
+  sliderPayment: {
+    background: "#E5E7EB",
+  },
+  sliderDifficulty: {
+    background: "#E5E7EB",
+  },
+  sliderThumb: {
+    width: "24px",
+    height: "24px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #ffffff, #f8fafc)",
+    border: "3px solid #3B82F6",
+    cursor: "pointer",
+    boxShadow: "0 4px 8px rgba(59, 130, 246, 0.3), 0 0 0 4px rgba(59, 130, 246, 0.1)",
+    appearance: "none",
+    WebkitAppearance: "none",
+    transition: "all 0.3s ease",
   },
   projectSelection: {
     marginBottom: "32px",
