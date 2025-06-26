@@ -17,8 +17,11 @@ const ProjectAdvisor = () => {
   ])
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [isRevealing, setIsRevealing] = useState(false)
+  const [revealingMessageId, setRevealingMessageId] = useState(null)
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef(null)
+  const typewriterTimeoutRef = useRef(null)
   const navigate = useNavigate()
 
   // Authentication check
@@ -52,8 +55,50 @@ const ProjectAdvisor = () => {
     scrollToBottom()
   }, [messages])
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (typewriterTimeoutRef.current) {
+        clearTimeout(typewriterTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  // Typewriter effect function
+  const typewriterEffect = (text, messageId, delay = 15) => {
+    return new Promise((resolve) => {
+      let currentIndex = 0
+      setIsRevealing(true)
+      setRevealingMessageId(messageId)
+      
+      const typeNextChar = () => {
+        if (currentIndex <= text.length) {
+          const partialText = text.substring(0, currentIndex)
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, content: partialText, isRevealing: currentIndex < text.length }
+              : msg
+          ))
+          
+          currentIndex++
+          
+          if (currentIndex <= text.length) {
+            typewriterTimeoutRef.current = setTimeout(typeNextChar, delay)
+          } else {
+            setIsRevealing(false)
+            setRevealingMessageId(null)
+            resolve()
+          }
+        }
+      }
+      
+      typeNextChar()
+    })
   }
 
   // Call Groq AI API for real AI responses
@@ -83,7 +128,7 @@ const ProjectAdvisor = () => {
   }
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() || isTyping || isRevealing) return
 
     const userMessage = {
       id: Date.now(),
@@ -101,25 +146,42 @@ const ProjectAdvisor = () => {
       // Get AI response from Groq API
       const aiResponseContent = await generateAIResponse(messageText, messages)
       
+      // Create initial empty AI message
+      const aiResponseId = Date.now() + 1
       const aiResponse = {
-        id: Date.now() + 1,
+        id: aiResponseId,
         type: "ai",
-        content: aiResponseContent,
+        content: "",
         timestamp: new Date(),
+        isRevealing: true,
       }
 
+      // Add empty message first
       setMessages((prev) => [...prev, aiResponse])
+      setIsTyping(false)
+
+      // Start typewriter effect
+      await typewriterEffect(aiResponseContent, aiResponseId)
+      
     } catch (error) {
       console.error('Error getting AI response:', error)
+      const errorResponseId = Date.now() + 1
       const errorResponse = {
-        id: Date.now() + 1,
+        id: errorResponseId,
         type: "ai",
-        content: "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        content: "",
         timestamp: new Date(),
+        isRevealing: true,
       }
+      
       setMessages((prev) => [...prev, errorResponse])
-    } finally {
       setIsTyping(false)
+      
+      // Type out error message
+      await typewriterEffect(
+        "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        errorResponseId
+      )
     }
   }
 
@@ -140,6 +202,8 @@ const ProjectAdvisor = () => {
   ]
 
   const handleQuickQuestion = async (question) => {
+    if (isTyping || isRevealing) return
+    
     // Immediately send the quick question
     const userMessage = {
       id: Date.now(),
@@ -155,25 +219,42 @@ const ProjectAdvisor = () => {
       // Get AI response for quick question
       const aiResponseContent = await generateAIResponse(question, messages)
       
+      // Create initial empty AI message
+      const aiResponseId = Date.now() + 1
       const aiResponse = {
-        id: Date.now() + 1,
+        id: aiResponseId,
         type: "ai",
-        content: aiResponseContent,
+        content: "",
         timestamp: new Date(),
+        isRevealing: true,
       }
 
+      // Add empty message first
       setMessages((prev) => [...prev, aiResponse])
+      setIsTyping(false)
+
+      // Start typewriter effect
+      await typewriterEffect(aiResponseContent, aiResponseId)
+
     } catch (error) {
       console.error('Error getting AI response for quick question:', error)
+      const errorResponseId = Date.now() + 1
       const errorResponse = {
-        id: Date.now() + 1,
+        id: errorResponseId,
         type: "ai",
-        content: "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        content: "",
         timestamp: new Date(),
+        isRevealing: true,
       }
+      
       setMessages((prev) => [...prev, errorResponse])
-    } finally {
       setIsTyping(false)
+      
+      // Type out error message
+      await typewriterEffect(
+        "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        errorResponseId
+      )
     }
   }
 
@@ -232,7 +313,9 @@ const ProjectAdvisor = () => {
                       ...(message.type === "user" ? styles.userMessage : styles.aiMessage),
                     }}
                   >
-                    <p style={styles.messageContent}>{message.content}</p>
+                    <p style={styles.messageContent}>
+                      {message.content}
+                    </p>
                     <span style={styles.messageTime}>
                       {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
@@ -246,8 +329,8 @@ const ProjectAdvisor = () => {
               </div>
             ))}
 
-            {/* Typing Indicator */}
-            {isTyping && (
+            {/* Typing Indicator - only show when waiting for AI response, not during reveal */}
+            {isTyping && !isRevealing && (
               <div style={styles.messageWrapper}>
                 <div style={styles.messageGroup}>
                   <div style={styles.aiAvatar}>
@@ -291,15 +374,15 @@ const ProjectAdvisor = () => {
                 placeholder="Ask me anything about project management..."
                 style={styles.messageInput}
                 rows={1}
-                disabled={isTyping}
+                disabled={isTyping || isRevealing}
               />
               <button
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isTyping}
-                style={{
-                  ...styles.sendButton,
-                  ...(!inputMessage.trim() || isTyping ? styles.sendButtonDisabled : {}),
-                }}
+                                  onClick={handleSendMessage}
+                  disabled={!inputMessage.trim() || isTyping || isRevealing}
+                  style={{
+                    ...styles.sendButton,
+                    ...(!inputMessage.trim() || isTyping || isRevealing ? styles.sendButtonDisabled : {}),
+                  }}
               >
                 <SendIcon />
               </button>
