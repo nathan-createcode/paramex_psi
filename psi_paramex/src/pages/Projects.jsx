@@ -255,7 +255,8 @@ export default function ProjectManagementPage() {
                   !formData.deadline ||
                   !formData.payment === "" ||
                   !formData.difficulty ||
-                  !formData.type
+                  !formData.type ||
+                  !formData.status
                 ) {
                   throw new Error("Please fill in all required fields.");
                 }
@@ -270,7 +271,7 @@ export default function ProjectManagementPage() {
                     payment_amount: formData.payment,
                     difficulty_level: formData.difficulty,
                     type_id: formData.type,
-                    status_id: "1", // default status
+                    status_id: formData.status,
                   },
                 ]);
                 if (error) throw error;
@@ -308,7 +309,8 @@ export default function ProjectManagementPage() {
                   !formData.deadline ||
                   formData.payment === "" ||
                   !formData.difficulty ||
-                  !formData.type
+                  !formData.type ||
+                  !formData.status
                 ) {
                   throw new Error("Please fill in all required fields.");
                 }
@@ -323,6 +325,7 @@ export default function ProjectManagementPage() {
                     payment_amount: formData.payment,
                     difficulty_level: formData.difficulty,
                     type_id: formData.type,
+                    status_id: formData.status,
                   })
                   .eq("project_id", editProjectId);
                 if (error) throw error;
@@ -373,6 +376,7 @@ export default function ProjectManagementPage() {
                   payment: data.payment_amount,
                   difficulty: data.difficulty_level,
                   type: data.type_id,
+                  status: data.status_id,
                 });
               } catch (err) {
                 setFormError("Failed to load project data.");

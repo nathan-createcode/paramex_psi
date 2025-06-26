@@ -19,10 +19,14 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     payment: 0,
     difficulty: "",
     type: "",
+    status: "",
   });
   const [typeOptions, setTypeOptions] = useState([]);
   const [typeLoading, setTypeLoading] = useState(true);
   const [typeError, setTypeError] = useState(null);
+  const [statusOptions, setStatusOptions] = useState([]);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [statusError, setStatusError] = useState(null);
 
   useEffect(() => {
     if (initialData) {
@@ -34,6 +38,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
         payment: initialData.payment ?? 0,
         difficulty: initialData.difficulty || "",
         type: initialData.type || "",
+        status: initialData.status || "",
       });
     }
   }, [initialData]);
@@ -54,6 +59,23 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
       }
     };
     fetchTypes();
+  }, []);
+
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      setStatusLoading(true);
+      setStatusError(null);
+      try {
+        const { data, error } = await supabase.from("project_status").select("*");
+        if (error) throw error;
+        setStatusOptions(data || []);
+      } catch {
+        setStatusError("Failed to load project statuses");
+      } finally {
+        setStatusLoading(false);
+      }
+    };
+    fetchStatuses();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -205,36 +227,67 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                     </select>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Type
-                </label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <select
-                    name="type"
-                    value={formData.type}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
-                    required
-                    disabled={typeLoading || !!typeError}
-                  >
-                    <option value="">
-                      {typeLoading ? "Loading types..." : "Select Project type"}
-                    </option>
-                    {typeError && (
-                      <option value="" disabled>
-                        {typeError}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Project Type
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <select
+                      name="type"
+                      value={formData.type}
+                      onChange={handleChange}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+                      required
+                      disabled={typeLoading || !!typeError}
+                    >
+                      <option value="">
+                        {typeLoading ? "Loading types..." : "Select Project type"}
                       </option>
-                    )}
-                    {typeOptions.map((type) => (
-                      <option key={type.type_id} value={type.type_id}>
-                        {type.type_name}
+                      {typeError && (
+                        <option value="" disabled>
+                          {typeError}
+                        </option>
+                      )}
+                      {typeOptions.map((type) => (
+                        <option key={type.type_id} value={type.type_id}>
+                          {type.type_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+                      required
+                      disabled={statusLoading || !!statusError}
+                    >
+                      <option value="">
+                        {statusLoading ? "Loading statuses..." : "Select Project status"}
                       </option>
-                    ))}
-                  </select>
+                      {statusError && (
+                        <option value="" disabled>
+                          {statusError}
+                        </option>
+                      )}
+                      {statusOptions.map((status) => (
+                        <option key={status.status_id} value={status.status_id}>
+                          {status.status_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
