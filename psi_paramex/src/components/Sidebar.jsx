@@ -27,17 +27,17 @@ const Sidebar = ({ open, setOpen }) => {
       icon: LayoutDashboard,
     },
     {
-      name: "Project",
+      name: "Projects",
       href: "/projects",
       icon: ClipboardCheck,
     },
     {
-      name: "DSS & AI",
+      name: "DSS",
       href: "/dss",
       icon: BrainCircuit,
     },
     {
-      name: "Project Advisor",
+      name: "AI Project Advisor",
       href: "/project-advisor",
       icon: BotMessageSquare,
     },
