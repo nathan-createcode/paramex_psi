@@ -7,11 +7,14 @@ const Header = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [isBellHovered, setIsBellHovered] = useState(false)
   const [isUserHovered, setIsUserHovered] = useState(false)
+  const [isDropdownItemHovered, setIsDropdownItemHovered] = useState(false)
 
   const handleAccountSettings = () => {
+    console.log("Account Settings button clicked!")
     setShowUserDropdown(false)
     // Trigger modal opening using custom event
     window.dispatchEvent(new CustomEvent("openAccountSettings"))
+    console.log("Custom event dispatched")
   }
 
   // Close dropdown when clicking outside
@@ -56,7 +59,15 @@ const Header = () => {
 
               {showUserDropdown && (
                 <div style={styles.dropdown}>
-                  <button style={styles.dropdownItem} onClick={handleAccountSettings}>
+                  <button 
+                    style={{
+                      ...styles.dropdownItem,
+                      backgroundColor: isDropdownItemHovered ? "#F3F4F6" : "transparent",
+                    }}
+                    onClick={handleAccountSettings}
+                    onMouseEnter={() => setIsDropdownItemHovered(true)}
+                    onMouseLeave={() => setIsDropdownItemHovered(false)}
+                  >
                     <UserRoundCog size={16} />
                     <span style={{ fontWeight: "bold" }}>Account Settings</span>
                   </button>
@@ -85,7 +96,7 @@ const styles = {
     backgroundColor: "white",
     position: "sticky",
     top: 0,
-    zIndex: 10,
+    zIndex: 50,
   },
   headerContent: {
     height: "100%",
@@ -167,6 +178,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "8px",
+    outline: "none",
   },
 }
 

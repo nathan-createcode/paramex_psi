@@ -18,14 +18,17 @@ const Layout = ({ children }) => {
   // Listen for account settings modal events from Header
   useEffect(() => {
     const handleOpenAccountSettings = () => {
+      console.log("openAccountSettings event received!")
       setAccountSettingsOpen(true)
     }
 
     // Add event listener for custom events from Header
     window.addEventListener("openAccountSettings", handleOpenAccountSettings)
+    console.log("Event listener added for openAccountSettings")
 
     return () => {
       window.removeEventListener("openAccountSettings", handleOpenAccountSettings)
+      console.log("Event listener removed for openAccountSettings")
     }
   }, [])
 
@@ -88,7 +91,7 @@ const styles = {
   container: {
     display: "flex",
     minHeight: "100vh",
-    backgroundColor: "#FEFEFE",
+    backgroundColor: "#F9FAFB",
   },
   mainContent: {
     flex: 1,
