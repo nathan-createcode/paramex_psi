@@ -103,6 +103,12 @@ const chartOptions = {
 // Specific options for Project Types Chart (with enhanced tooltip)
 const typesChartOptions = {
   ...chartOptions,
+  animation: {
+    easing: 'easeInOutQuart', // Smoother easing
+  },
+  interaction: {
+    intersect: false, // Better hover behavior
+  },
   plugins: {
     ...chartOptions.plugins,
     legend: {
@@ -427,27 +433,10 @@ const Dashboard = () => {
       ],
     }
 
-    // Project types data (filtered)
+    // Project types data (filtered) - Improved to maintain consistency
     const typeMap = new Map()
     
-    // Get unique project types from filtered data (for current view)
-    const uniqueTypes = [...new Set(filteredProjects.map(p => p.project_type).filter(Boolean))]
-    
-    console.log('Filtered projects count:', filteredProjects.length)
-    console.log('Unique types from filtered data:', uniqueTypes)
-    
-    uniqueTypes.forEach((typeName) => {
-      typeMap.set(typeName, { count: 0, earnings: 0 })
-    })
-
-    // Debug: Show detailed project type breakdown
-    console.log('Filtered projects with types:', filteredProjects.map(p => ({
-      name: p.project_name,
-      type: p.project_type,
-      status: p.status,
-      created_at: p.created_at
-    })))
-
+    // Process filtered projects and count by type
     filteredProjects.forEach((project) => {
       const typeName = project.project_type || "Unknown"
       const current = typeMap.get(typeName) || { count: 0, earnings: 0 }
@@ -458,15 +447,20 @@ const Dashboard = () => {
       })
     })
 
-    const projectTypeData = Array.from(typeMap.entries()).map(([typeName, data]) => ({
-      type: typeName,
-      count: data.count,
-      earnings: data.earnings,
-    }))
+    // Convert to array and filter out empty types (count > 0)
+    const projectTypeData = Array.from(typeMap.entries())
+      .map(([typeName, data]) => ({
+        type: typeName,
+        count: data.count,
+        earnings: data.earnings,
+      }))
+      .filter(item => item.count > 0) // Only include types that have projects
+      .sort((a, b) => b.count - a.count) // Sort by count descending for better UX
 
+    console.log('Filtered projects count:', filteredProjects.length)
     console.log('Project type breakdown:', projectTypeData)
 
-    // Create colors array for project types (consistent with trendsData)
+    // Create consistent colors for project types
     const defaultColors = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EF4444", "#6B7280"]
 
     const typesData = {
@@ -717,7 +711,14 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="h-64 relative">
-                <Bar data={typesData} options={typesChartOptions} />
+                {typesData.labels.length > 0 ? (
+                  <Bar data={typesData} options={typesChartOptions} />
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                    <div className="text-4xl mb-2">📊</div>
+                    <p className="text-sm">No projects in selected time period</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
