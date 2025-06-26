@@ -9,8 +9,42 @@ import AccountSettingsModal from "../pages/AccountSettingsModal"
 const Layout = ({ children }) => {
   const location = useLocation()
   const navigate = useNavigate()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  
+  // Sync with sidebar state from localStorage
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const savedState = localStorage.getItem('sidebarOpen')
+    return savedState !== null ? JSON.parse(savedState) : true
+  })
+  
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false)
+
+  // Listen for sidebar state changes from localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const savedState = localStorage.getItem('sidebarOpen')
+      if (savedState !== null) {
+        setSidebarOpen(JSON.parse(savedState))
+      }
+    }
+
+    // Listen for storage events (when localStorage changes)
+    window.addEventListener('storage', handleStorageChange)
+    
+    // Also listen for custom event from sidebar
+    const handleSidebarToggle = () => {
+      const savedState = localStorage.getItem('sidebarOpen')
+      if (savedState !== null) {
+        setSidebarOpen(JSON.parse(savedState))
+      }
+    }
+    
+    window.addEventListener('sidebarToggle', handleSidebarToggle)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('sidebarToggle', handleSidebarToggle)
+    }
+  }, [])
 
   // Don't show layout for login/register/landing pages
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register" || location.pathname === "/"
@@ -47,18 +81,18 @@ const Layout = ({ children }) => {
     }
   }
 
-  // Handle responsive sidebar
+  // Handle responsive sidebar - only for screen resize, not initial state
   useEffect(() => {
     const handleResize = () => {
+      // Only force close on mobile, but don't force open on desktop
+      // Let localStorage state persist unless we're on mobile
       if (window.innerWidth < 768) {
         setSidebarOpen(false)
-      } else {
-        setSidebarOpen(true)
+        localStorage.setItem('sidebarOpen', JSON.stringify(false))
+        window.dispatchEvent(new Event('sidebarToggle'))
       }
+      // Don't automatically open on desktop - respect localStorage state
     }
-
-    // Set initial state
-    handleResize()
 
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
@@ -70,11 +104,11 @@ const Layout = ({ children }) => {
 
   return (
     <div style={styles.container}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      <Sidebar />
       <div
         style={{
           ...styles.mainContent,
-          marginLeft: sidebarOpen ? "280px" : "80px",
+          marginLeft: sidebarOpen ? "300px" : "80px",
         }}
       >
         <Header />
