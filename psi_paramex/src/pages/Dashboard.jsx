@@ -476,8 +476,8 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div style={styles.loadingContainer}>
-          <div style={styles.spinner}></div>
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
           <p>Loading dashboard...</p>
         </div>
       </Layout>
@@ -487,10 +487,13 @@ const Dashboard = () => {
   if (error) {
     return (
       <Layout>
-        <div style={styles.errorContainer}>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <h2>Error Loading Dashboard</h2>
           <p>{error}</p>
-          <button onClick={() => window.location.reload()} style={styles.retryButton}>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 mt-4 bg-blue-500 text-white border-none rounded-lg cursor-pointer"
+          >
             Retry
           </button>
         </div>
@@ -502,84 +505,100 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div style={styles.container}>
+      <div className="min-h-screen p-6 font-sans">
         {/* Dynamic Welcome Header */}
-        <div style={styles.welcomeSection}>
-          <h1 style={styles.title}>Dashboard Overview</h1>
-          <p style={styles.subtitle}>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
+          <p className="text-lg text-gray-600 leading-relaxed">
             Welcome back, {user?.user_metadata?.full_name || user?.email}! You have{" "}
-            <span style={styles.highlight}>{summary.totalProjects} projects</span>,{" "}
-            <span style={styles.highlightYellow}>{summary.onProcess} in progress</span>, and earned{" "}
-            <span style={styles.highlightGreen}>${summary.monthlyEarnings.toLocaleString()} this month</span>.
+            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg" >
+              {summary.totalProjects} projects
+            </span>
+            ,{" "}
+            <span className="font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
+              {summary.onProcess} in progress
+            </span>
+            , and earned{" "}
+            <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+              ${summary.monthlyEarnings.toLocaleString()} this month
+            </span>
+            .
           </p>
         </div>
 
         {/* Summary Cards - 6 Cards seperti di gambar */}
-        <div style={styles.summaryGrid} className="dashboard-summary-grid">
+        <div className="grid grid-cols-6 xl:grid-cols-6 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4 mb-8">
           {[
             {
               title: "Total Projects",
               value: summary.totalProjects.toString(),
               icon: BarChart3Icon,
               iconColor: "#3B82F6",
-              bgColor: "rgba(59, 130, 246, 0.1)",
+              bgColor: "bg-blue-50",
             },
             {
               title: "On-Plan",
               value: summary.onPlan.toString(),
               icon: ClockIcon,
               iconColor: "#3B82F6",
-              bgColor: "rgba(59, 130, 246, 0.1)",
+              bgColor: "bg-blue-50",
             },
             {
               title: "On-Process",
               value: summary.onProcess.toString(),
               icon: TrendingUpIcon,
               iconColor: "#EAB308",
-              bgColor: "rgba(234, 179, 8, 0.1)",
+              bgColor: "bg-yellow-50",
             },
             {
               title: "On-Discuss",
               value: summary.onDiscuss.toString(),
               icon: MessageSquareIcon,
               iconColor: "#A855F7",
-              bgColor: "rgba(168, 85, 247, 0.1)",
+              bgColor: "bg-purple-50",
             },
             {
               title: "Completed",
               value: summary.completed.toString(),
               icon: CheckCircleIcon,
               iconColor: "#10B981",
-              bgColor: "rgba(16, 185, 129, 0.1)",
+              bgColor: "bg-green-50",
             },
             {
               title: "Total Earnings",
               value: `$${summary.totalEarnings.toLocaleString()}`,
               icon: DollarSignIcon,
               iconColor: "#10B981",
-              bgColor: "rgba(16, 185, 129, 0.1)",
+              bgColor: "bg-green-50",
             },
           ].map((item, index) => (
-            <div key={index} style={styles.summaryCard}>
-              <div style={{ ...styles.cardIcon, backgroundColor: item.bgColor }}>
+            <div
+              key={index}
+              className="bg-white rounded-2xl p-6 flex items-center gap-4 shadow-md/5 transition-all duration-200 border border-gray-100 cursor-default"
+            > 
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${item.bgColor}`}>
                 <item.icon color={item.iconColor} />
               </div>
-              <div style={styles.cardContent}>
-                <p style={styles.cardTitle}>{item.title}</p>
-                <h3 style={styles.cardValue}>{item.value}</h3>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600 mb-1">{item.title}</p>
+                <h3 className="text-2xl font-bold text-gray-900">{item.value}</h3>
               </div>
             </div>
           ))}
         </div>
 
         {/* Filtered Analytics Section */}
-        <div style={styles.analyticsSection}>
-          <div style={styles.sectionHeader}>
-            <div style={styles.sectionTitleContainer}>
+        <div className="mb-8">
+          <div className="flex flex-row gap-4 items-center justify-between mb-6 flex-wrap">
+            <div className="flex items-center gap-2">
               <FilterIcon />
-              <h2 style={styles.sectionTitle}>Filtered Analytics</h2>
+              <h2 className="text-xl font-bold text-gray-900">Filtered Analytics</h2>
             </div>
-            <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} style={styles.filterSelect}>
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+              className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none"
+            >
               <option value="all">All Time</option>
               <option value="0">This Month</option>
               <option value="1">Last Month</option>
@@ -588,31 +607,31 @@ const Dashboard = () => {
             </select>
           </div>
 
-          <div style={styles.chartsGrid}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Status Chart */}
-            <div style={styles.chartCard}>
-              <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Project Status</h3>
-                <div style={styles.filteredBadge}>
+            <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Project Status</h3>
+                <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
                   <FilterIcon />
                   <span>Filtered</span>
                 </div>
               </div>
-              <div style={styles.chartContainer}>
+              <div className="h-64 relative">
                 <Doughnut data={statusData} options={doughnutOptions} />
               </div>
             </div>
 
             {/* Project Types Chart */}
-            <div style={styles.chartCard}>
-              <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Project Types</h3>
-                <div style={styles.filteredBadge}>
+            <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Project Types</h3>
+                <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
                   <FilterIcon />
                   <span>Filtered</span>
                 </div>
               </div>
-              <div style={styles.chartContainer}>
+              <div className="h-64 relative">
                 <Bar data={typesData} options={chartOptions} />
               </div>
             </div>
@@ -620,37 +639,37 @@ const Dashboard = () => {
         </div>
 
         {/* Overall Performance Section */}
-        <div style={styles.performanceSection}>
-          <div style={styles.sectionTitleContainer}>
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-6">
             <GlobeIcon />
-            <h2 style={styles.sectionTitle}>Overall Performance</h2>
+            <h2 className="text-xl font-bold text-gray-900">Overall Performance</h2>
           </div>
 
-          <div style={styles.chartsGrid}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Trends Chart */}
-            <div style={styles.chartCard}>
-              <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Project Trends</h3>
-                <div style={styles.globalBadge}>
+            <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Project Trends</h3>
+                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
                   <GlobeIcon />
                   <span>Global View</span>
                 </div>
               </div>
-              <div style={styles.chartContainer}>
+              <div className="h-64 relative">
                 <Line data={trendsData} options={chartOptions} />
               </div>
             </div>
 
             {/* Earnings Chart */}
-            <div style={styles.chartCard}>
-              <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Monthly Earnings</h3>
-                <div style={styles.globalBadge}>
+            <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Monthly Earnings</h3>
+                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
                   <GlobeIcon />
                   <span>Global View</span>
                 </div>
               </div>
-              <div style={styles.chartContainer}>
+              <div className="h-64 relative">
                 <Line data={earningsData} options={chartOptions} />
               </div>
             </div>
@@ -659,13 +678,16 @@ const Dashboard = () => {
 
         {/* Empty State */}
         {projects.length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>📊</div>
-            <h3 style={styles.emptyTitle}>No Projects Yet</h3>
-            <p style={styles.emptyDescription}>
+          <div className="text-center py-15 px-5 bg-white rounded-3xl shadow-md/5 border border-gray-100 mt-8">
+            <div className="text-6xl mb-4">📊</div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Projects Yet</h3>
+            <p className="text-base text-gray-600 mb-6">
               Start by adding your first project to see analytics and insights here.
             </p>
-            <button style={styles.addButton} onClick={() => navigate("/projects")}>
+            <button
+              className="px-6 py-3 bg-blue-500 text-white border-none rounded-xl cursor-pointer text-base font-medium transition-all duration-200"
+              onClick={() => navigate("/projects")}
+            >
               Add Your First Project
             </button>
           </div>
@@ -674,283 +696,5 @@ const Dashboard = () => {
     </Layout>
   )
 }
-
-// Styles object - Menghapus media queries dari inline styles
-const styles = {
-  container: {
-    minHeight: "100vh",
-    backgroundColor: "#f9fafb",
-    padding: "24px",
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  },
-  loadingContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "50vh",
-  },
-  spinner: {
-    width: "40px",
-    height: "40px",
-    border: "4px solid #e5e7eb",
-    borderTop: "4px solid #3b82f6",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-    marginBottom: "16px",
-  },
-  errorContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "50vh",
-    textAlign: "center",
-  },
-  retryButton: {
-    padding: "12px 24px",
-    backgroundColor: "#3b82f6",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    marginTop: "16px",
-  },
-  welcomeSection: {
-    marginBottom: "32px",
-  },
-  title: {
-    fontSize: "30px",
-    fontWeight: "bold",
-    color: "#111827",
-    margin: "0 0 8px 0",
-  },
-  subtitle: {
-    fontSize: "18px",
-    color: "#6b7280",
-    margin: 0,
-    lineHeight: "1.6",
-  },
-  highlight: {
-    fontWeight: "bold",
-    color: "#2563eb",
-    backgroundColor: "#dbeafe",
-    padding: "4px 8px",
-    borderRadius: "8px",
-  },
-  highlightYellow: {
-    fontWeight: "bold",
-    color: "#d97706",
-    backgroundColor: "#fef3c7",
-    padding: "4px 8px",
-    borderRadius: "8px",
-  },
-  highlightGreen: {
-    fontWeight: "bold",
-    color: "#059669",
-    backgroundColor: "#d1fae5",
-    padding: "4px 8px",
-    borderRadius: "8px",
-  },
-  summaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(6, 1fr)", // Paksa 6 kolom
-    gap: "16px", // Kurangi gap agar muat
-    marginBottom: "32px",
-  },
-  summaryCard: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    padding: "24px",
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-    transition: "all 0.2s",
-    border: "none",
-    cursor: "default",
-  },
-  cardIcon: {
-    height: "48px",
-    width: "48px",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#6b7280",
-    margin: "0 0 4px 0",
-  },
-  cardValue: {
-    fontSize: "24px",
-    fontWeight: "bold",
-    color: "#111827",
-    margin: 0,
-  },
-  analyticsSection: {
-    marginBottom: "32px",
-  },
-  sectionHeader: {
-    display: "flex",
-    flexDirection: "row",
-    gap: "16px",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "24px",
-    flexWrap: "wrap",
-  },
-  sectionTitleContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  sectionTitle: {
-    fontSize: "20px",
-    fontWeight: "bold",
-    color: "#111827",
-    margin: 0,
-  },
-  filterSelect: {
-    padding: "8px 16px",
-    borderRadius: "12px",
-    border: "1px solid #d1d5db",
-    backgroundColor: "white",
-    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-    fontSize: "14px",
-    cursor: "pointer",
-    outline: "none",
-  },
-  performanceSection: {
-    marginBottom: "32px",
-  },
-  chartsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))",
-    gap: "24px",
-  },
-  chartCard: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    padding: "24px",
-    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-    border: "none",
-    position: "relative",
-  },
-  chartHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "16px",
-  },
-  chartTitle: {
-    fontSize: "20px",
-    fontWeight: "bold",
-    color: "#111827",
-    margin: 0,
-  },
-  filteredBadge: {
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-    padding: "4px 8px",
-    backgroundColor: "#dbeafe",
-    color: "#1d4ed8",
-    borderRadius: "20px",
-    fontSize: "12px",
-    fontWeight: "500",
-  },
-  globalBadge: {
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-    padding: "4px 8px",
-    backgroundColor: "#dcfce7",
-    color: "#166534",
-    borderRadius: "20px",
-    fontSize: "12px",
-    fontWeight: "500",
-  },
-  chartContainer: {
-    height: "256px",
-    position: "relative",
-  },
-  emptyState: {
-    textAlign: "center",
-    padding: "60px 20px",
-    backgroundColor: "white",
-    borderRadius: "24px",
-    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-    marginTop: "32px",
-  },
-  emptyIcon: {
-    fontSize: "64px",
-    marginBottom: "16px",
-  },
-  emptyTitle: {
-    fontSize: "24px",
-    fontWeight: "bold",
-    color: "#111827",
-    margin: "0 0 8px 0",
-  },
-  emptyDescription: {
-    fontSize: "16px",
-    color: "#6b7280",
-    margin: "0 0 24px 0",
-  },
-  addButton: {
-    padding: "12px 24px",
-    backgroundColor: "#3b82f6",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "16px",
-    fontWeight: "500",
-    transition: "all 0.2s",
-  },
-}
-
-// Update CSS stylesheet untuk responsive
-const styleSheet = document.createElement("style")
-styleSheet.type = "text/css"
-styleSheet.innerText = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  @media (max-width: 1200px) {
-    .dashboard-summary-grid {
-      grid-template-columns: repeat(3, 1fr) !important;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .dashboard-charts-grid {
-      grid-template-columns: 1fr !important;
-    }
-    .dashboard-summary-grid {
-      grid-template-columns: repeat(2, 1fr) !important;
-    }
-    .dashboard-section-header {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .dashboard-summary-grid {
-      grid-template-columns: 1fr !important;
-    }
-  }
-`
-document.head.appendChild(styleSheet)
 
 export default Dashboard
