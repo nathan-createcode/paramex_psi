@@ -19,6 +19,8 @@ import {
 } from "chart.js"
 import { Line, Bar, Doughnut } from "react-chartjs-2"
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns"
+import { ChevronDown } from "lucide-react"
+import Dropdown from "../components/ui/dropdown"
 
 // Register Chart.js components including Filler
 ChartJS.register(
@@ -686,17 +688,21 @@ const Dashboard = () => {
               <FilterIcon />
               <h2 className="text-xl font-bold text-gray-900">Filtered Analytics</h2>
             </div>
-            <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value)}
-              className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none"
-            >
-              <option value="all">All Time</option>
-              <option value="0">This Month</option>
-              <option value="1">Last Month</option>
-              <option value="2">2 Months Ago</option>
-              <option value="3">3 Months Ago</option>
-            </select>
+            <div className="relative">
+              <Dropdown
+                value={timeFilter}
+                onChange={(value) => setTimeFilter(value)}
+                options={[
+                  { value: "all", label: "All Time" },
+                  { value: "0", label: "This Month" },
+                  { value: "1", label: "Last Month" },
+                  { value: "2", label: "2 Months Ago" },
+                  { value: "3", label: "3 Months Ago" }
+                ]}
+                placeholder="Select time period"
+                className="min-w-[180px]"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
