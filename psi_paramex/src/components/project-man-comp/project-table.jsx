@@ -1,24 +1,16 @@
 import React from "react";
 import StatusBadge from "./status-badge";
 import { formatCurrency, getDeadlineStatus } from "../../utils/project-utils";
-import { ChevronUp, ChevronDown } from "lucide-react";
 
 export default function ProjectTable({ projects, onRowClick, onContextAction, sortConfig, onSort }) {
   // Komponen header yang dapat di-sort
   const SortableHeader = ({ children, sortKey }) => (
-    <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">
+    <th className="text-center py-4 px-6 text-sm font-semibold text-gray-700">
       <button
-        className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+        className="hover:text-blue-600 transition-colors w-full"
         onClick={() => onSort && onSort(sortKey)}
       >
         {children}
-        {sortConfig?.key === sortKey && (
-          sortConfig.direction === 'asc' ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )
-        )}
       </button>
     </th>
   );
@@ -26,17 +18,17 @@ export default function ProjectTable({ projects, onRowClick, onContextAction, so
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Fixed Header */}
-      <div className="overflow-x-auto border-b border-gray-200">
-        <table className="w-full">
+      <div className="border-b border-gray-200">
+        <table className="w-full table-fixed" style={{ width: 'calc(100% - 17px)' }}>
           <colgroup>
-            <col className="w-auto" />
-            <col className="w-auto" />
-            <col className="w-auto" />
-            <col className="w-auto" />
-            <col className="w-auto" />
-            <col className="w-auto" />
-            <col className="w-auto" />
-            <col className="w-auto" />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '12%' }} />
           </colgroup>
           <thead className="bg-white">
             <tr>
@@ -55,19 +47,18 @@ export default function ProjectTable({ projects, onRowClick, onContextAction, so
       
       {/* Scrollable Body */}
       <div className="max-h-[500px] overflow-y-auto">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <colgroup>
-              <col className="w-auto" />
-              <col className="w-auto" />
-              <col className="w-auto" />
-              <col className="w-auto" />
-              <col className="w-auto" />
-              <col className="w-auto" />
-              <col className="w-auto" />
-              <col className="w-auto" />
-            </colgroup>
-            <tbody className="divide-y divide-gray-100">
+        <table className="w-full table-fixed">
+          <colgroup>
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '12%' }} />
+          </colgroup>
+          <tbody className="divide-y divide-gray-100">
             {projects.map((project) => (
               <tr
                 key={project.id}
@@ -77,37 +68,36 @@ export default function ProjectTable({ projects, onRowClick, onContextAction, so
                   onContextAction(project, { x: e.pageX, y: e.pageY });
                 }}
               >
-                <td className="py-4 px-6">
-                  <div className="text-sm font-medium text-gray-900">{project.name}</div>
+                <td className="py-4 px-6 overflow-hidden text-center">
+                  <div className="text-sm font-medium text-gray-900 truncate">{project.name}</div>
                 </td>
-                <td className="py-4 px-6">
-                  <div className="text-sm text-gray-600">{project.client}</div>
+                <td className="py-4 px-6 overflow-hidden text-center">
+                  <div className="text-sm text-gray-600 truncate">{project.client}</div>
                 </td>
-                <td className="py-4 px-6">
-                  <div className="text-sm text-gray-600">{project.startDate}</div>
+                <td className="py-4 px-6 overflow-hidden text-center">
+                  <div className="text-sm text-gray-600 truncate">{project.startDate}</div>
                 </td>
-                <td className="py-4 px-6">
-                  <div className={`text-sm ${getDeadlineStatus(project.deadline, project.status).className}`}>
+                <td className="py-4 px-6 overflow-hidden text-center">
+                  <div className={`text-sm truncate ${getDeadlineStatus(project.deadline, project.status).className}`}>
                     {project.deadline}
                   </div>
                 </td>
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 overflow-hidden text-center">
                   <StatusBadge status={project.type} type="project-type" />
                 </td>
-                <td className="py-4 px-6">
-                  <div className="text-sm font-medium text-gray-900">{formatCurrency(project.payment)}</div>
+                <td className="py-4 px-6 overflow-hidden text-center">
+                  <div className="text-sm font-medium text-gray-900 truncate">{formatCurrency(project.payment)}</div>
                 </td>
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 overflow-hidden text-center">
                   <StatusBadge status={project.difficulty} type="difficulty" />
                 </td>
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 overflow-hidden text-center">
                   <StatusBadge status={project.status} />
                 </td>
               </tr>
             ))}
             </tbody>
           </table>
-        </div>
       </div>
     </div>
   );
