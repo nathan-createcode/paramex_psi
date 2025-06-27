@@ -125,12 +125,15 @@ export const formatCurrency = (amount) => {
     return '$0';
   }
   
+  // Ensure we don't format numbers that are too large
+  const safeAmount = Math.min(Math.max(numAmount, 0), 2147483647);
+  
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  }).format(numAmount);
+  }).format(safeAmount);
 };
 
 /**

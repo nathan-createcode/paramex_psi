@@ -93,9 +93,10 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     // Remove any non-numeric characters except digits
     let numericValue = value.toString().replace(/[^\d]/g, "");
     
-    // Limit to maximum 15 digits to prevent precision issues
-    if (numericValue.length > 15) {
-      numericValue = numericValue.slice(0, 15);
+    // Limit to maximum 10 digits to prevent PostgreSQL INTEGER overflow (2,147,483,647)
+    // This allows up to $2.1 billion which should be sufficient for most projects
+    if (numericValue.length > 10) {
+      numericValue = numericValue.slice(0, 10);
     }
     
     // Format with dot as thousand separator
@@ -107,9 +108,14 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     // Remove dots (thousand separators) and keep only digits
     let numericValue = value.toString().replace(/\./g, "").replace(/[^\d]/g, "");
     
-    // Limit to maximum 15 digits
-    if (numericValue.length > 15) {
-      numericValue = numericValue.slice(0, 15);
+    // Limit to maximum 10 digits to prevent PostgreSQL INTEGER overflow
+    if (numericValue.length > 10) {
+      numericValue = numericValue.slice(0, 10);
+    }
+    
+    // Additional safety check: ensure the number doesn't exceed PostgreSQL INTEGER limit
+    if (numericValue && parseInt(numericValue) > 2147483647) {
+      numericValue = "2147483647";
     }
     
     return numericValue === "" ? "" : numericValue;
