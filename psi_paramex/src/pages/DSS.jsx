@@ -9,14 +9,41 @@ const DSS = () => {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [calculating, setCalculating] = useState(false)
-  const [weights, setWeights] = useState({
-    deadline: 40,
-    payment: 30,
-    difficulty: 30,
+  const [weights, setWeights] = useState(() => {
+    // Load weights from localStorage or use default
+    const savedWeights = localStorage.getItem('dss-weights')
+    return savedWeights ? JSON.parse(savedWeights) : {
+      deadline: 40,
+      payment: 30,
+      difficulty: 30,
+    }
   })
-  const [selectedProjects, setSelectedProjects] = useState("all")
-  const [priorityResults, setPriorityResults] = useState([])
+  const [selectedProjects, setSelectedProjects] = useState(() => {
+    // Load selected projects from localStorage or use default
+    const savedSelection = localStorage.getItem('dss-selected-projects')
+    return savedSelection ? JSON.parse(savedSelection) : "all"
+  })
+  const [priorityResults, setPriorityResults] = useState(() => {
+    // Load priority results from localStorage or use empty array
+    const savedResults = localStorage.getItem('dss-priority-results')
+    return savedResults ? JSON.parse(savedResults) : []
+  })
   const navigate = useNavigate()
+
+  // Save weights to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('dss-weights', JSON.stringify(weights))
+  }, [weights])
+
+  // Save selected projects to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('dss-selected-projects', JSON.stringify(selectedProjects))
+  }, [selectedProjects])
+
+  // Save priority results to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('dss-priority-results', JSON.stringify(priorityResults))
+  }, [priorityResults])
 
   // Add custom CSS for sliders
   useEffect(() => {
@@ -89,6 +116,26 @@ const DSS = () => {
       .payment-slider:focus,
       .difficulty-slider:focus {
         animation: pulse 2s ease-in-out infinite;
+      }
+
+      /* Custom scrollbar for results list */
+      .results-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+      
+      .results-scroll::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      
+      .results-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+        transition: background 0.2s ease;
+      }
+      
+      .results-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
       }
     `
     document.head.appendChild(style)
@@ -218,6 +265,16 @@ const DSS = () => {
     }))
   }
 
+  // Clear stored data function (optional - for debugging or reset functionality)
+  const clearStoredData = () => {
+    localStorage.removeItem('dss-weights')
+    localStorage.removeItem('dss-selected-projects')
+    localStorage.removeItem('dss-priority-results')
+    setWeights({ deadline: 40, payment: 30, difficulty: 30 })
+    setSelectedProjects("all")
+    setPriorityResults([])
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -229,9 +286,9 @@ const DSS = () => {
     )
   }
 
-  return (
-    <Layout>
-      <div className="max-w-7xl mx-auto" style={styles.container}>
+      return (
+      <Layout>
+        <div className="max-w-6xl mx-auto" style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
           <div>
@@ -395,7 +452,7 @@ const DSS = () => {
                   </p>
                 </div>
               ) : (
-                <div style={styles.resultsList}>
+                <div style={styles.resultsList} className="results-scroll">
                   {priorityResults.map((result, index) => {
                     // Calculate progress percentage based on highest score
                     const maxScore = Math.max(...priorityResults.map(r => r.score))
@@ -558,7 +615,7 @@ const styles = {
     marginBottom: "16px",
   },
   header: {
-    marginBottom: "32px",
+    marginBottom: "20px",
   },
   title: {
     fontSize: "32px",
@@ -573,27 +630,32 @@ const styles = {
   },
   content: {
     display: "grid",
-    gridTemplateColumns: "1fr 2fr",
-    gap: "32px",
+    gridTemplateColumns: "400px 1fr",
+    gap: "20px",
     alignItems: "start",
+    maxWidth: "1200px",
+    padding: "0 8px",
   },
   formCard: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-    overflow: "hidden",
+    backgroundColor: "transparent",
+    borderRadius: "0",
+    boxShadow: "none",
+    overflow: "visible",
   },
   resultsCard: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    backgroundColor: "transparent",
+    borderRadius: "0",
+    boxShadow: "none",
     overflow: "hidden",
+    height: "calc(100vh - 240px)",
+    display: "flex",
+    flexDirection: "column",
   },
   cardHeader: {
-    padding: "24px 32px 0 32px",
-    borderBottom: "1px solid #F3F4F6",
-    paddingBottom: "16px",
-    marginBottom: "24px",
+    padding: "0 0 0 0",
+    borderBottom: "none",
+    paddingBottom: "12px",
+    marginBottom: "16px",
   },
   cardTitle: {
     fontSize: "20px",
@@ -605,13 +667,18 @@ const styles = {
     gap: "8px",
   },
   cardContent: {
-    padding: "0 32px 32px 32px",
+    padding: "0",
+    flex: 1,
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
   },
   weightsContainer: {
     display: "flex",
     flexDirection: "column",
-    gap: "24px",
-    marginBottom: "32px",
+    gap: "16px",
+    marginBottom: "20px",
+    padding: "0 8px",
   },
   weightGroup: {
     display: "flex",
@@ -677,7 +744,8 @@ const styles = {
     transition: "all 0.3s ease",
   },
   projectSelection: {
-    marginBottom: "32px",
+    marginBottom: "20px",
+    padding: "0 8px",
   },
   selectLabel: {
     display: "block",
@@ -696,6 +764,10 @@ const styles = {
     cursor: "pointer",
     boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
     outline: "none",
+    appearance: "none",
+    WebkitAppearance: "none",
+    MozAppearance: "none",
+    backgroundImage: "none",
   },
   calculateButton: {
     width: "100%",
@@ -751,6 +823,10 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "16px",
+    overflowY: "auto",
+    flex: 1,
+    padding: "0 8px 8px 0",
+    maxHeight: "100%",
   },
   resultItem: {
     display: "flex",
