@@ -81,152 +81,140 @@ const Settings = () => {
 
   return (
     <Layout>
-      <div style={styles.container}>
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div style={styles.header}>
-          <div>
-            <h1 style={styles.title}>App Settings</h1>
-            <p style={styles.subtitle}>Manage your application preferences and configurations</p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">App Settings</h1>
+          <p className="text-lg text-gray-600 leading-relaxed">Manage your application preferences and configurations</p>
         </div>
 
-        <div style={styles.content}>
+        <div className="space-y-6">
           {/* Appearance & Theme */}
-          <div style={styles.settingsCard}>
-            <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>
+          <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <PaletteIcon />
                 Appearance & Theme
               </h2>
             </div>
-            <div style={styles.cardContent}>
-              <div style={styles.settingGroup}>
-                <div style={styles.settingItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Theme</label>
-                    <p style={styles.settingDescription}>Choose your preferred color scheme</p>
-                  </div>
-                  <select
-                    value={settings.theme}
-                    onChange={(e) => handleSettingChange("theme", e.target.value)}
-                    style={styles.select}
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="system">System</option>
-                  </select>
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Theme</label>
+                  <p className="text-sm text-gray-600">Choose your preferred color scheme</p>
                 </div>
+                <select
+                  value={settings.theme}
+                  onChange={(e) => handleSettingChange("theme", e.target.value)}
+                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
+                >
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                  <option value="system">System</option>
+                </select>
+              </div>
 
-                <div style={styles.settingItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Default View</label>
-                    <p style={styles.settingDescription}>Choose which page to show when you log in</p>
-                  </div>
-                  <select
-                    value={settings.defaultView}
-                    onChange={(e) => handleSettingChange("defaultView", e.target.value)}
-                    style={styles.select}
-                  >
-                    <option value="dashboard">Dashboard</option>
-                    <option value="projects">Projects</option>
-                    <option value="dss">DSS & AI</option>
-                  </select>
+              <div className="flex justify-between items-center">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Default View</label>
+                  <p className="text-sm text-gray-600">Choose which page to show when you log in</p>
                 </div>
+                <select
+                  value={settings.defaultView}
+                  onChange={(e) => handleSettingChange("defaultView", e.target.value)}
+                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
+                >
+                  <option value="dashboard">Dashboard</option>
+                  <option value="projects">Projects</option>
+                  <option value="dss">DSS & AI</option>
+                </select>
               </div>
             </div>
           </div>
 
           {/* Notifications */}
-          <div style={styles.settingsCard}>
-            <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>
+          <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <BellIcon />
                 Notifications
               </h2>
             </div>
-            <div style={styles.cardContent}>
-              <div style={styles.settingGroup}>
-                <div style={styles.toggleItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Email Notifications</label>
-                    <p style={styles.settingDescription}>Receive project updates via email</p>
-                  </div>
-                  <div style={styles.toggleContainer}>
-                    <input
-                      type="checkbox"
-                      checked={settings.emailNotifications}
-                      onChange={(e) => handleSettingChange("emailNotifications", e.target.checked)}
-                      style={styles.toggleInput}
-                    />
+            <div className="space-y-6">
+              <div className="flex justify-between items-center py-2">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Email Notifications</label>
+                  <p className="text-sm text-gray-600">Receive project updates via email</p>
+                </div>
+                <div className="relative cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.emailNotifications}
+                    onChange={(e) => handleSettingChange("emailNotifications", e.target.checked)}
+                    className="absolute opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${
+                      settings.emailNotifications ? 'bg-blue-500' : 'bg-gray-300'
+                    }`}
+                  >
                     <div
-                      style={{
-                        ...styles.toggleSlider,
-                        backgroundColor: settings.emailNotifications ? "#3B82F6" : "#D1D5DB",
-                      }}
-                    >
-                      <div
-                        style={{
-                          ...styles.toggleThumb,
-                          transform: settings.emailNotifications ? "translateX(20px)" : "translateX(0)",
-                        }}
-                      ></div>
-                    </div>
+                      className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                        settings.emailNotifications ? 'translate-x-5' : 'translate-x-0.5'
+                      } mt-0.5`}
+                    ></div>
                   </div>
                 </div>
+              </div>
 
-                <div style={styles.toggleItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Push Notifications</label>
-                    <p style={styles.settingDescription}>Receive notifications in the browser</p>
-                  </div>
-                  <div style={styles.toggleContainer}>
-                    <input
-                      type="checkbox"
-                      checked={settings.pushNotifications}
-                      onChange={(e) => handleSettingChange("pushNotifications", e.target.checked)}
-                      style={styles.toggleInput}
-                    />
+              <div className="flex justify-between items-center py-2">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Push Notifications</label>
+                  <p className="text-sm text-gray-600">Receive notifications in the browser</p>
+                </div>
+                <div className="relative cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.pushNotifications}
+                    onChange={(e) => handleSettingChange("pushNotifications", e.target.checked)}
+                    className="absolute opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${
+                      settings.pushNotifications ? 'bg-blue-500' : 'bg-gray-300'
+                    }`}
+                  >
                     <div
-                      style={{
-                        ...styles.toggleSlider,
-                        backgroundColor: settings.pushNotifications ? "#3B82F6" : "#D1D5DB",
-                      }}
-                    >
-                      <div
-                        style={{
-                          ...styles.toggleThumb,
-                          transform: settings.pushNotifications ? "translateX(20px)" : "translateX(0)",
-                        }}
-                      ></div>
-                    </div>
+                      className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                        settings.pushNotifications ? 'translate-x-5' : 'translate-x-0.5'
+                      } mt-0.5`}
+                    ></div>
                   </div>
                 </div>
+              </div>
 
-                <div style={styles.toggleItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>AI Suggestions</label>
-                    <p style={styles.settingDescription}>Allow AI to provide project recommendations and insights</p>
-                  </div>
-                  <div style={styles.toggleContainer}>
-                    <input
-                      type="checkbox"
-                      checked={settings.aiSuggestions}
-                      onChange={(e) => handleSettingChange("aiSuggestions", e.target.checked)}
-                      style={styles.toggleInput}
-                    />
+              <div className="flex justify-between items-center py-2">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">AI Suggestions</label>
+                  <p className="text-sm text-gray-600">Allow AI to provide project recommendations and insights</p>
+                </div>
+                <div className="relative cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.aiSuggestions}
+                    onChange={(e) => handleSettingChange("aiSuggestions", e.target.checked)}
+                    className="absolute opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${
+                      settings.aiSuggestions ? 'bg-blue-500' : 'bg-gray-300'
+                    }`}
+                  >
                     <div
-                      style={{
-                        ...styles.toggleSlider,
-                        backgroundColor: settings.aiSuggestions ? "#3B82F6" : "#D1D5DB",
-                      }}
-                    >
-                      <div
-                        style={{
-                          ...styles.toggleThumb,
-                          transform: settings.aiSuggestions ? "translateX(20px)" : "translateX(0)",
-                        }}
-                      ></div>
-                    </div>
+                      className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                        settings.aiSuggestions ? 'translate-x-5' : 'translate-x-0.5'
+                      } mt-0.5`}
+                    ></div>
                   </div>
                 </div>
               </div>
@@ -234,128 +222,125 @@ const Settings = () => {
           </div>
 
           {/* Regional Settings */}
-          <div style={styles.settingsCard}>
-            <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>
+          <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <GlobeIcon />
                 Regional Settings
               </h2>
             </div>
-            <div style={styles.cardContent}>
-              <div style={styles.settingGroup}>
-                <div style={styles.settingItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Language</label>
-                    <p style={styles.settingDescription}>Choose your preferred language</p>
-                  </div>
-                  <select
-                    value={settings.language}
-                    onChange={(e) => handleSettingChange("language", e.target.value)}
-                    style={styles.select}
-                  >
-                    <option value="en">English</option>
-                    <option value="id">Bahasa Indonesia</option>
-                    <option value="es">Español</option>
-                    <option value="fr">Français</option>
-                  </select>
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Language</label>
+                  <p className="text-sm text-gray-600">Choose your preferred language</p>
                 </div>
+                <select
+                  value={settings.language}
+                  onChange={(e) => handleSettingChange("language", e.target.value)}
+                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
+                >
+                  <option value="en">English</option>
+                  <option value="id">Bahasa Indonesia</option>
+                  <option value="es">Español</option>
+                  <option value="fr">Français</option>
+                </select>
+              </div>
 
-                <div style={styles.settingItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Timezone</label>
-                    <p style={styles.settingDescription}>Set your local timezone</p>
-                  </div>
-                  <select
-                    value={settings.timezone}
-                    onChange={(e) => handleSettingChange("timezone", e.target.value)}
-                    style={styles.select}
-                  >
-                    <option value="UTC">UTC</option>
-                    <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
-                    <option value="America/New_York">America/New_York (EST)</option>
-                    <option value="Europe/London">Europe/London (GMT)</option>
-                  </select>
+              <div className="flex justify-between items-center">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Timezone</label>
+                  <p className="text-sm text-gray-600">Set your local timezone</p>
                 </div>
+                <select
+                  value={settings.timezone}
+                  onChange={(e) => handleSettingChange("timezone", e.target.value)}
+                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
+                >
+                  <option value="UTC">UTC</option>
+                  <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                  <option value="America/New_York">America/New_York (EST)</option>
+                  <option value="Europe/London">Europe/London (GMT)</option>
+                </select>
+              </div>
 
-                <div style={styles.settingItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Currency</label>
-                    <p style={styles.settingDescription}>Default currency for payments</p>
-                  </div>
-                  <select
-                    value={settings.currency}
-                    onChange={(e) => handleSettingChange("currency", e.target.value)}
-                    style={styles.select}
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="IDR">IDR (Rp)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                  </select>
+              <div className="flex justify-between items-center">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Currency</label>
+                  <p className="text-sm text-gray-600">Default currency for payments</p>
                 </div>
+                <select
+                  value={settings.currency}
+                  onChange={(e) => handleSettingChange("currency", e.target.value)}
+                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
+                >
+                  <option value="USD">USD ($)</option>
+                  <option value="IDR">IDR (Rp)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="GBP">GBP (£)</option>
+                </select>
               </div>
             </div>
           </div>
 
           {/* Data & Privacy */}
-          <div style={styles.settingsCard}>
-            <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>
+          <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <ShieldIcon />
                 Data & Privacy
               </h2>
             </div>
-            <div style={styles.cardContent}>
-              <div style={styles.actionGroup}>
-                <div style={styles.actionItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Export Data</label>
-                    <p style={styles.settingDescription}>Download your project data</p>
-                  </div>
-                  <button style={styles.actionButton}>
-                    <DownloadIcon />
-                    Export
-                  </button>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Export Data</label>
+                  <p className="text-sm text-gray-600">Download your project data</p>
                 </div>
+                <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-sm font-medium">
+                  <DownloadIcon />
+                  Export
+                </button>
+              </div>
 
-                <div style={styles.actionItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Clear Cache</label>
-                    <p style={styles.settingDescription}>Clear application cache</p>
-                  </div>
-                  <button style={styles.actionButton}>
-                    <TrashIcon />
-                    Clear
-                  </button>
+              <div className="flex justify-between items-center py-2">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Clear Cache</label>
+                  <p className="text-sm text-gray-600">Clear application cache</p>
                 </div>
+                <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-sm font-medium">
+                  <TrashIcon />
+                  Clear
+                </button>
+              </div>
 
-                <div style={styles.actionItem}>
-                  <div style={styles.settingInfo}>
-                    <label style={styles.settingLabel}>Delete Account</label>
-                    <p style={styles.settingDescription}>Permanently delete your account and all data</p>
-                  </div>
-                  <button style={{ ...styles.actionButton, ...styles.dangerButton }}>
-                    <TrashIcon />
-                    Delete
-                  </button>
+              <div className="flex justify-between items-center py-2">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">Delete Account</label>
+                  <p className="text-sm text-gray-600">Permanently delete your account and all data</p>
                 </div>
+                <button className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium">
+                  <TrashIcon />
+                  Delete
+                </button>
               </div>
             </div>
           </div>
 
           {/* Save Button */}
-          <div style={styles.saveContainer}>
+          <div className="flex justify-center pt-6">
             <button
               onClick={handleSaveSettings}
               disabled={saving}
-              style={{
-                ...styles.saveButton,
-                ...(saving ? styles.saveButtonDisabled : {}),
-              }}
+              className={`flex items-center gap-2 px-8 py-4 rounded-xl text-base font-medium transition-all duration-200 ${
+                saving
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-blue-500 hover:bg-blue-600 shadow-lg hover:shadow-xl'
+              } text-white`}
             >
               {saving ? (
                 <>
-                  <div style={styles.buttonSpinner}></div>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Saving...
                 </>
               ) : (
@@ -426,205 +411,5 @@ const SaveIcon = () => (
     <polyline points="7,3 7,8 15,8" />
   </svg>
 )
-
-const styles = {
-  container: {
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  },
-  loadingContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "50vh",
-  },
-  spinner: {
-    width: "40px",
-    height: "40px",
-    border: "4px solid #e5e7eb",
-    borderTop: "4px solid #3b82f6",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-    marginBottom: "16px",
-  },
-  header: {
-    marginBottom: "32px",
-  },
-  title: {
-    fontSize: "32px",
-    fontWeight: "bold",
-    color: "#1f2937",
-    margin: "0 0 8px 0",
-  },
-  subtitle: {
-    fontSize: "16px",
-    color: "#6b7280",
-    margin: 0,
-  },
-  content: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-  },
-  settingsCard: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-    overflow: "hidden",
-  },
-  cardHeader: {
-    padding: "24px 32px 0 32px",
-    borderBottom: "1px solid #F3F4F6",
-    paddingBottom: "16px",
-    marginBottom: "24px",
-  },
-  cardTitle: {
-    fontSize: "20px",
-    fontWeight: "600",
-    color: "#1f2937",
-    margin: 0,
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  cardContent: {
-    padding: "0 32px 32px 32px",
-  },
-  settingGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "24px",
-  },
-  settingItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
-  },
-  toggleItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
-    padding: "16px 0",
-    borderBottom: "1px solid #F3F4F6",
-  },
-  actionItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
-    padding: "16px 0",
-    borderBottom: "1px solid #F3F4F6",
-  },
-  settingInfo: {
-    flex: 1,
-  },
-  settingLabel: {
-    fontSize: "16px",
-    fontWeight: "500",
-    color: "#1F2937",
-    display: "block",
-    marginBottom: "4px",
-  },
-  settingDescription: {
-    fontSize: "14px",
-    color: "#6B7280",
-    margin: 0,
-  },
-  select: {
-    padding: "8px 12px",
-    border: "1px solid #D1D5DB",
-    borderRadius: "8px",
-    fontSize: "14px",
-    backgroundColor: "white",
-    cursor: "pointer",
-    minWidth: "150px",
-    boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
-  },
-  toggleContainer: {
-    position: "relative",
-    cursor: "pointer",
-  },
-  toggleInput: {
-    position: "absolute",
-    opacity: 0,
-    cursor: "pointer",
-  },
-  toggleSlider: {
-    width: "44px",
-    height: "24px",
-    borderRadius: "12px",
-    transition: "background-color 0.3s",
-    position: "relative",
-  },
-  toggleThumb: {
-    width: "20px",
-    height: "20px",
-    borderRadius: "50%",
-    backgroundColor: "white",
-    position: "absolute",
-    top: "2px",
-    left: "2px",
-    transition: "transform 0.3s",
-    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-  },
-  actionGroup: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  actionButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px 16px",
-    backgroundColor: "#F3F4F6",
-    color: "#374151",
-    border: "1px solid #D1D5DB",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-    transition: "all 0.2s",
-    boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
-  },
-  dangerButton: {
-    backgroundColor: "#FEF2F2",
-    color: "#DC2626",
-    borderColor: "#FECACA",
-  },
-  saveContainer: {
-    display: "flex",
-    justifyContent: "center",
-    padding: "24px 0",
-  },
-  saveButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "16px 32px",
-    backgroundColor: "#3B82F6",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "16px",
-    fontWeight: "500",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-    transition: "all 0.2s",
-  },
-  saveButtonDisabled: {
-    backgroundColor: "#9CA3AF",
-    cursor: "not-allowed",
-  },
-  buttonSpinner: {
-    width: "20px",
-    height: "20px",
-    border: "2px solid transparent",
-    borderTop: "2px solid white",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  },
-}
 
 export default Settings
