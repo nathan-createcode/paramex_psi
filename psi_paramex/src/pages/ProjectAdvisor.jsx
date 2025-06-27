@@ -95,7 +95,7 @@ const ProjectAdvisor = () => {
     const defaultMessage = {
       id: 1,
       type: "ai",
-      content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I'm connected to advanced AI capabilities to provide you with intelligent, personalized advice. What would you like to discuss today?",
+      content: "Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization.",
       timestamp: new Date(),
     }
     setMessages([defaultMessage])
@@ -107,7 +107,7 @@ const ProjectAdvisor = () => {
   }
 
   // Typewriter effect function
-  const typewriterEffect = (text, messageId, delay = 15) => {
+  const typewriterEffect = (text, messageId, delay = 0.5) => {
     return new Promise((resolve) => {
       let currentIndex = 0
       setIsRevealing(true)
@@ -166,7 +166,7 @@ const ProjectAdvisor = () => {
   }
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isTyping || isRevealing) return
+    if (!inputMessage.trim() || isTyping) return
 
     const userMessage = {
       id: Date.now(),
@@ -309,7 +309,7 @@ const ProjectAdvisor = () => {
 
   return (
     <Layout>
-      <div style={styles.container}>
+      <div className="max-w-7xl mx-auto" style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerContent}>
@@ -319,23 +319,6 @@ const ProjectAdvisor = () => {
                 AI Project Advisor
               </h1>
               <p style={styles.subtitle}>Get intelligent advice for your freelance project management challenges</p>
-            </div>
-            <div style={styles.headerActions}>
-              <div style={styles.statusIndicator}>
-                <div style={styles.statusDot}></div>
-                <span style={styles.statusText}>Meta Llama AI Online</span>
-              </div>
-              {messages.length > 1 && (
-                <button 
-                  onClick={clearChatHistory} 
-                  style={styles.clearButton}
-                  className="clearButton"
-                  title="Clear chat history"
-                >
-                  <ClearIcon />
-                  Clear Chat
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -389,9 +372,9 @@ const ProjectAdvisor = () => {
                   </div>
                   <div style={{ ...styles.messageBubble, ...styles.aiMessage }}>
                     <div style={styles.typingIndicator}>
-                      <div style={styles.typingDot}></div>
-                      <div style={styles.typingDot}></div>
-                      <div style={styles.typingDot}></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
                     </div>
                   </div>
                 </div>
@@ -407,7 +390,18 @@ const ProjectAdvisor = () => {
               <h3 style={styles.quickQuestionsTitle}>Quick Questions</h3>
               <div style={styles.quickQuestionsList}>
                 {quickQuestions.map((question, index) => (
-                  <button key={index} onClick={() => handleQuickQuestion(question)} style={styles.quickQuestionButton} className="quickQuestionButton">
+                  <button 
+                    key={index} 
+                    onClick={() => handleQuickQuestion(question)} 
+                    style={styles.quickQuestionButton} 
+                    className="quickQuestionButton"
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#F3F4F6'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#F9FAFB'
+                    }}
+                  >
                     {question}
                   </button>
                 ))}
@@ -418,6 +412,20 @@ const ProjectAdvisor = () => {
           {/* Input Area */}
           <div style={styles.inputContainer}>
             <div style={styles.inputWrapper}>
+              <button 
+                onClick={clearChatHistory} 
+                style={styles.clearButtonLeft}
+                className="clearButton"
+                title="Clear chat history"
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#2563EB'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#3B82F6'
+                }}
+              >
+                <ClearIcon />
+              </button>
               <textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
@@ -425,24 +433,36 @@ const ProjectAdvisor = () => {
                 placeholder="Ask me anything about project management..."
                 style={styles.messageInput}
                 rows={1}
-                disabled={isTyping || isRevealing}
+                disabled={false}
               />
               <button
-                                  onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isTyping || isRevealing}
-                  style={{
-                    ...styles.sendButton,
-                    ...(!inputMessage.trim() || isTyping || isRevealing ? styles.sendButtonDisabled : {}),
-                  }}
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isTyping}
+                style={{
+                  ...styles.sendButton,
+                  ...(!inputMessage.trim() || isTyping ? styles.sendButtonDisabled : {}),
+                }}
+                onMouseEnter={(e) => {
+                  if (!(!inputMessage.trim() || isTyping)) {
+                    e.target.style.backgroundColor = '#2563EB'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!(!inputMessage.trim() || isTyping)) {
+                    e.target.style.backgroundColor = '#3B82F6'
+                  }
+                }}
               >
                 <SendIcon />
               </button>
             </div>
-            <p style={styles.inputHint}>Press Enter to send, Shift + Enter for new line</p>
-            <div style={styles.storageIndicator}>
-              <SaveIcon />
-              <span>Chat history saved locally</span>
-            </div>
+            <p style={styles.inputHint}>
+              {isTyping || isRevealing ? (
+                <>AI is responding... You can still type your next message. <strong>Chat history saved locally</strong></>
+              ) : (
+                <>Press Enter to send, Shift + Enter for new line, <strong>Chat history saved locally</strong></>
+              )}
+            </p>
           </div>
         </div>
       </div>
@@ -483,18 +503,9 @@ const ClearIcon = () => (
   </svg>
 )
 
-const SaveIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-    <polyline points="17,21 17,13 7,13 7,21" />
-    <polyline points="7,3 7,8 15,8" />
-  </svg>
-)
-
 const styles = {
   container: {
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-    height: "calc(100vh - 48px)",
     display: "flex",
     flexDirection: "column",
   },
@@ -515,11 +526,7 @@ const styles = {
     marginBottom: "16px",
   },
   header: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    padding: "24px 32px",
     marginBottom: "24px",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
   },
   headerContent: {
     display: "flex",
@@ -543,40 +550,16 @@ const styles = {
     color: "#6b7280",
     margin: 0,
   },
-  headerActions: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  statusIndicator: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px 16px",
-    backgroundColor: "#ECFDF5",
-    borderRadius: "20px",
-    border: "1px solid #A7F3D0",
-  },
-  statusDot: {
-    width: "8px",
-    height: "8px",
-    backgroundColor: "#10B981",
-    borderRadius: "50%",
-    animation: "pulse 2s infinite",
-  },
-  statusText: {
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#059669",
-  },
   chatContainer: {
-    flex: 1,
-    backgroundColor: "white",
-    borderRadius: "24px",
+    backgroundColor: "transparent",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    maxWidth: "900px", // Increased from 700px for better screen utilization
+    width: "100%", // Full width of parent
+    margin: "0 auto",
+    height: "calc(100vh - 240px)", // Responsive height based on viewport (reduced padding)
+    minHeight: "750px", // Increased minimum height
   },
   messagesContainer: {
     flex: 1,
@@ -585,6 +568,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "16px",
+    minHeight: 0, // Allow flex shrinking
   },
   messageWrapper: {
     display: "flex",
@@ -594,7 +578,7 @@ const styles = {
     display: "flex",
     alignItems: "flex-end",
     gap: "12px",
-    maxWidth: "80%",
+    maxWidth: "80%", // Increased from 70% for wider messages
   },
   aiAvatar: {
     width: "32px",
@@ -653,11 +637,11 @@ const styles = {
     height: "8px",
     backgroundColor: "#6B7280",
     borderRadius: "50%",
-    animation: "typing 1.4s infinite ease-in-out",
   },
   quickQuestionsContainer: {
     padding: "24px",
-    borderTop: "1px solid #F3F4F6",
+    flexShrink: 0, // Prevent quick questions from shrinking
+    backgroundColor: "transparent", // Transparent background
   },
   quickQuestionsTitle: {
     fontSize: "16px",
@@ -667,8 +651,8 @@ const styles = {
   },
   quickQuestionsList: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: "12px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", // Increased minimum width
+    gap: "16px", // Increased gap for better spacing
   },
   quickQuestionButton: {
     padding: "12px 16px",
@@ -684,7 +668,8 @@ const styles = {
   },
   inputContainer: {
     padding: "24px",
-    borderTop: "1px solid #F3F4F6",
+    flexShrink: 0, // Prevent input area from shrinking
+    backgroundColor: "transparent", // Transparent background
   },
   inputWrapper: {
     display: "flex",
@@ -725,33 +710,19 @@ const styles = {
     margin: "8px 0 0 0",
     textAlign: "center",
   },
-  clearButton: {
-    padding: "8px 16px",
-    backgroundColor: "transparent",
+  clearButtonLeft: {
+    padding: "12px",
+    backgroundColor: "#3B82F6",
+    color: "white",
     border: "none",
     borderRadius: "12px",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
-    gap: "6px",
-    fontSize: "14px",
-    color: "#6B7280",
-    transition: "all 0.2s",
-    boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
-  },
-  storageIndicator: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px 16px",
-    backgroundColor: "#ECFDF5",
-    borderRadius: "20px",
-    border: "1px solid #A7F3D0",
-    marginTop: "8px",
-    fontSize: "12px",
-    color: "#059669",
-    fontWeight: "500",
     justifyContent: "center",
+    transition: "all 0.2s",
+    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    flexShrink: 0,
   },
 }
 
@@ -770,8 +741,23 @@ styleSheet.innerText = `
   }
 
   @keyframes typing {
-    0%, 60%, 100% { transform: translateY(0); }
-    30% { transform: translateY(-10px); }
+    0% { 
+      transform: translateY(0); 
+    }
+    50% { 
+      transform: translateY(-8px); 
+    }
+    100% { 
+      transform: translateY(0); 
+    }
+  }
+
+  .typing-dot {
+    animation: typing 0.8s infinite ease-in-out;
+  }
+
+  .typing-dot:nth-child(1) {
+    animation-delay: 0s;
   }
 
   .typing-dot:nth-child(2) {
@@ -783,15 +769,11 @@ styleSheet.innerText = `
   }
 
   .clearButton:hover {
-    background-color: #FEF2F2;
-    color: #DC2626;
-    transform: translateY(-1px);
+    background-color: #2563EB;
   }
 
   .quickQuestionButton:hover {
     background-color: #F3F4F6;
-    transform: translateY(-1px);
-    box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.1), -4px -4px 8px rgba(255, 255, 255, 0.9);
   }
 `
 document.head.appendChild(styleSheet)
