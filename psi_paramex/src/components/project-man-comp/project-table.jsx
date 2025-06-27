@@ -25,9 +25,20 @@ export default function ProjectTable({ projects, onRowClick, onContextAction, so
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* Fixed Header */}
+      <div className="overflow-x-auto border-b border-gray-200">
         <table className="w-full">
-          <thead className="bg-white rounded-3xl p-6 shadow-sm mb-6">
+          <colgroup>
+            <col className="w-auto" />
+            <col className="w-auto" />
+            <col className="w-auto" />
+            <col className="w-auto" />
+            <col className="w-auto" />
+            <col className="w-auto" />
+            <col className="w-auto" />
+            <col className="w-auto" />
+          </colgroup>
+          <thead className="bg-white">
             <tr>
               <SortableHeader sortKey="name">Project Name</SortableHeader>
               <SortableHeader sortKey="client">Client</SortableHeader>
@@ -39,7 +50,24 @@ export default function ProjectTable({ projects, onRowClick, onContextAction, so
               <SortableHeader sortKey="status">Status</SortableHeader>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+        </table>
+      </div>
+      
+      {/* Scrollable Body */}
+      <div className="max-h-[500px] overflow-y-auto">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <colgroup>
+              <col className="w-auto" />
+              <col className="w-auto" />
+              <col className="w-auto" />
+              <col className="w-auto" />
+              <col className="w-auto" />
+              <col className="w-auto" />
+              <col className="w-auto" />
+              <col className="w-auto" />
+            </colgroup>
+            <tbody className="divide-y divide-gray-100">
             {projects.map((project) => (
               <tr
                 key={project.id}
@@ -77,8 +105,9 @@ export default function ProjectTable({ projects, onRowClick, onContextAction, so
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
