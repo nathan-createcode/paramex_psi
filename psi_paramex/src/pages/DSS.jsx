@@ -404,12 +404,6 @@ const DSS = () => {
               </div>
 
               {/* Calculate Button */}
-              {/* Debug info */}
-              <div style={{ marginBottom: "16px", fontSize: "14px", color: "#6B7280" }}>
-                Projects loaded: {projects.length} 
-                {projects.length === 0 && " (Button disabled - no projects found)"}
-              </div>
-
               <button
                 onClick={calculatePriority}
                 disabled={calculating || projects.length === 0}
