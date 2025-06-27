@@ -214,87 +214,150 @@ export default function ProjectManagementPage() {
 
   return (
     <Layout>
-      <div className="min-h-screen px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Project Management
-            </h1>
-            <p className="text-gray-600">
-              Manage and track all your freelance projects
-            </p>
-          </div>
-
-          <SearchAndFilters
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            filters={filters}
-            onFiltersChange={setFilters}
-            onAddProject={() => {
-              setFormError(null);
-              setFormSuccess(null);
-              setShowProjectForm(true);
-            }}
-          />
-
-          {formSuccess && (
-            <div className="mb-4 p-3 rounded-lg bg-green-100 text-green-800 border border-green-200">
-              {formSuccess}
-            </div>
-          )}
-          {formError && (
-            <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-800 border border-red-200">
-              {formError}
-            </div>
-          )}
-
-          <ProjectTable
-            projects={displayProjects}
-            sortConfig={sortConfig}
-            onSort={handleSort}
-            onContextAction={(project, position) => {
-              setContextMenu({
-                visible: true,
-                x: position.x,
-                y: position.y,
-                project,
-              });
-            }}
-          />
-
-          <div className="mt-6 text-sm text-gray-500">
-            Showing {filteredProjects.length} of {projects.length} projects
-          </div>
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Project Management
+          </h1>
+          <p className="text-gray-600">
+            Manage and track all your freelance projects
+          </p>
         </div>
-        {showProjectForm && (
-          <ProjectForm
-            onClose={() => setShowProjectForm(false)}
-            loading={formLoading}
-            onSubmit={async (formData) => {
-              console.log("userId:", userId);
-              console.log("formData:", formData);
 
-              setFormError(null);
-              setFormSuccess(null);
-              setFormLoading(true);
-              try {
-                // Validasi sederhana (bisa dikembangkan sesuai kebutuhan)
-                if (!userId) throw new Error("User not authenticated");
-                if (
-                  !formData.name ||
-                  !formData.client ||
-                  !formData.startDate ||
-                  !formData.deadline ||
-                  formData.payment === "" ||
-                  !formData.difficulty ||
-                  !formData.type ||
-                  !formData.status
-                ) {
-                  throw new Error("Please fill in all required fields.");
-                }
-                // Insert ke Supabase
-                const projectData = {
-                  user_id: userId,
+        <SearchAndFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onAddProject={() => {
+            setFormError(null);
+            setFormSuccess(null);
+            setShowProjectForm(true);
+          }}
+        />
+
+        {formSuccess && (
+          <div className="mb-4 p-3 rounded-lg bg-green-100 text-green-800 border border-green-200">
+            {formSuccess}
+          </div>
+        )}
+        {formError && (
+          <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-800 border border-red-200">
+            {formError}
+          </div>
+        )}
+
+        <ProjectTable
+          projects={displayProjects}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          onContextAction={(project, position) => {
+            setContextMenu({
+              visible: true,
+              x: position.x,
+              y: position.y,
+              project,
+            });
+          }}
+        />
+
+        <div className="mt-6 text-sm text-gray-500">
+          Showing {filteredProjects.length} of {projects.length} projects
+        </div>
+      </div>
+
+      {showProjectForm && (
+        <ProjectForm
+          onClose={() => setShowProjectForm(false)}
+          loading={formLoading}
+          onSubmit={async (formData) => {
+            console.log("userId:", userId);
+            console.log("formData:", formData);
+
+            setFormError(null);
+            setFormSuccess(null);
+            setFormLoading(true);
+            try {
+              // Validasi sederhana (bisa dikembangkan sesuai kebutuhan)
+              if (!userId) throw new Error("User not authenticated");
+              if (
+                !formData.name ||
+                !formData.client ||
+                !formData.startDate ||
+                !formData.deadline ||
+                formData.payment === "" ||
+                !formData.difficulty ||
+                !formData.type ||
+                !formData.status
+              ) {
+                throw new Error("Please fill in all required fields.");
+              }
+              // Insert ke Supabase
+              const projectData = {
+                user_id: userId,
+                project_name: formData.name,
+                client_name: formData.client,
+                start_date: formData.startDate,
+                deadline: formData.deadline,
+                payment_amount: formData.payment,
+                difficulty_level: formData.difficulty,
+                type_id: formData.type,
+                status_id: formData.status,
+              };
+
+              console.log("Inserting project with simple method:", projectData);
+
+              // Use simple insert method - no SQL needed!
+              const result = await insertProjectAuto(projectData);
+              
+              if (!result.success) {
+                throw new Error(result.error || "Failed to insert project");
+              }
+              
+              console.log("Successfully inserted project:", result.data);
+              setFormSuccess("Project successfully added!");
+              setShowProjectForm(false);
+              await fetchProjects(userId);
+            } catch (err) {
+              setFormError(err.message || "Failed to add project.");
+            } finally {
+              setFormLoading(false);
+            }
+          }}
+        />
+      )}
+      {showEditForm && (
+        <ProjectForm
+          onClose={() => {
+            setShowEditForm(false);
+            setEditProjectId(null);
+            setEditProjectData(null);
+          }}
+          loading={editFormLoading}
+          editMode={true}
+          initialData={editProjectData}
+          onSubmit={async (formData) => {
+            setFormError(null);
+            setFormSuccess(null);
+            setEditFormLoading(true);
+            try {
+              if (!userId) throw new Error("User not authenticated");
+              if (
+                !formData.name ||
+                !formData.client ||
+                !formData.startDate ||
+                !formData.deadline ||
+                formData.payment === "" ||
+                !formData.difficulty ||
+                !formData.type ||
+                !formData.status
+              ) {
+                throw new Error("Please fill in all required fields.");
+              }
+              // Update project in Supabase
+              const { error } = await supabase
+                .from("projects")
+                .update({
                   project_name: formData.name,
                   client_name: formData.client,
                   start_date: formData.startDate,
@@ -303,86 +366,22 @@ export default function ProjectManagementPage() {
                   difficulty_level: formData.difficulty,
                   type_id: formData.type,
                   status_id: formData.status,
-                };
-
-                console.log("Inserting project with simple method:", projectData);
-
-                // Use simple insert method - no SQL needed!
-                const result = await insertProjectAuto(projectData);
-                
-                if (!result.success) {
-                  throw new Error(result.error || "Failed to insert project");
-                }
-                
-                console.log("Successfully inserted project:", result.data);
-                setFormSuccess("Project successfully added!");
-                setShowProjectForm(false);
-                await fetchProjects(userId);
-              } catch (err) {
-                setFormError(err.message || "Failed to add project.");
-              } finally {
-                setFormLoading(false);
-              }
-            }}
-          />
-        )}
-        {showEditForm && (
-          <ProjectForm
-            onClose={() => {
+                })
+                .eq("project_id", editProjectId);
+              if (error) throw error;
+              setFormSuccess("Project successfully updated!");
               setShowEditForm(false);
               setEditProjectId(null);
               setEditProjectData(null);
-            }}
-            loading={editFormLoading}
-            editMode={true}
-            initialData={editProjectData}
-            onSubmit={async (formData) => {
-              setFormError(null);
-              setFormSuccess(null);
-              setEditFormLoading(true);
-              try {
-                if (!userId) throw new Error("User not authenticated");
-                if (
-                  !formData.name ||
-                  !formData.client ||
-                  !formData.startDate ||
-                  !formData.deadline ||
-                  formData.payment === "" ||
-                  !formData.difficulty ||
-                  !formData.type ||
-                  !formData.status
-                ) {
-                  throw new Error("Please fill in all required fields.");
-                }
-                // Update project in Supabase
-                const { error } = await supabase
-                  .from("projects")
-                  .update({
-                    project_name: formData.name,
-                    client_name: formData.client,
-                    start_date: formData.startDate,
-                    deadline: formData.deadline,
-                    payment_amount: formData.payment,
-                    difficulty_level: formData.difficulty,
-                    type_id: formData.type,
-                    status_id: formData.status,
-                  })
-                  .eq("project_id", editProjectId);
-                if (error) throw error;
-                setFormSuccess("Project successfully updated!");
-                setShowEditForm(false);
-                setEditProjectId(null);
-                setEditProjectData(null);
-                await fetchProjects(userId);
-              } catch (err) {
-                setFormError(err.message || "Failed to update project.");
-              } finally {
-                setEditFormLoading(false);
-              }
-            }}
-          />
-        )}
-      </div>
+              await fetchProjects(userId);
+            } catch (err) {
+              setFormError(err.message || "Failed to update project.");
+            } finally {
+              setEditFormLoading(false);
+            }
+          }}
+        />
+      )}
 
       {contextMenu.visible && (
         <div
@@ -441,6 +440,7 @@ export default function ProjectManagementPage() {
           </button>
         </div>
       )}
+
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 bg-opacity-50">
           <div className="bg-white rounded-lg shadow-md p-6 w-[90%] max-w-md">
