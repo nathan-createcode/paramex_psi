@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Lock, Bell, Palette, Save, X } from "lucide-react"
+import { User, Lock, Bell, Palette, Save, X, ChevronDown } from "lucide-react"
 import { supabase } from "../supabase/supabase" // Sesuaikan path
+import Dropdown from "../components/ui/dropdown"
 
 const AccountSettingsModal = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("profile")
@@ -492,15 +493,17 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "24px" }}>
               <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Theme</label>
-              <select
+              <Dropdown
                 value={formData.theme}
-                onChange={(e) => handleInputChange("theme", e.target.value)}
-                style={styles.select}
-              >
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="system">System</option>
-              </select>
+                onChange={(value) => handleInputChange("theme", value)}
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
+                  { value: "system", label: "System" }
+                ]}
+                placeholder="Select theme"
+                className="w-full"
+              />
             </div>
             <button 
               style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
