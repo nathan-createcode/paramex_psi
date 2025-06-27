@@ -33,26 +33,75 @@ export default function FilterDropdown({
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-white shadow-md/5 flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all duration-200 min-w-[140px]"
+        className={`bg-white shadow-md/5 flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-lg hover:border-gray-300 transition-all duration-200 min-w-[140px] ${
+          isOpen ? 'bg-gray-50 shadow-lg border-gray-300' : ''
+        }`}
       >
-        <span className="text-sm text-gray-600 truncate">{displayValue}</span>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="text-sm text-gray-600 truncate transition-colors duration-200">{displayValue}</span>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-all duration-300 ${
+          isOpen ? 'rotate-180 text-blue-500' : ''
+        }`} />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-10 py-2">
-          {options.map((option) => (
-            <button
-              key={option}
-              onClick={() => handleSelect(option)}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors duration-150 flex items-center justify-between"
-            >
-              <span className={option === value ? 'text-black font-medium' : 'text-gray-700'}>
-                {option === 'all' ? placeholder : option}
-              </span>
-              {option === value && <Check className="w-4 h-4 text-black" />}
-            </button>
-          ))}
+        <div 
+          className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 transition-all duration-200 ease-out"
+          style={{
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            animation: 'dropIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}
+        >
+          <style>{`
+            @keyframes dropIn {
+              0% {
+                opacity: 0;
+                transform: translateY(-8px) scale(0.95);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            
+            @keyframes slideIn {
+              0% {
+                opacity: 0;
+                transform: translateX(-8px);
+              }
+              100% {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+          `}</style>
+
+          {options.map((option, index) => {
+            const isSelected = option === value;
+            
+            return (
+              <button
+                key={option}
+                onClick={() => handleSelect(option)}
+                className={`w-full px-4 py-2 text-left text-sm transition-all duration-200 flex items-center justify-between group ${
+                  isSelected 
+                    ? 'bg-blue-50 text-blue-900 font-medium border-l-2 border-blue-500' 
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+                style={{
+                  animation: `slideIn 0.3s ease-out ${index * 50}ms both`
+                }}
+              >
+                <span className="transition-transform duration-200 group-hover:translate-x-1">
+                  {option === 'all' ? placeholder : option}
+                </span>
+                <div className="flex-shrink-0 ml-2">
+                  {isSelected && (
+                    <Check className="w-4 h-4 text-blue-600" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
