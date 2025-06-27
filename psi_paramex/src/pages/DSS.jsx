@@ -288,7 +288,7 @@ const DSS = () => {
 
       return (
       <Layout>
-        <div className="max-w-6xl mx-auto" style={styles.container}>
+        <div className="max-w-7xl mx-auto" style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
           <div>
@@ -633,7 +633,6 @@ const styles = {
     gridTemplateColumns: "400px 1fr",
     gap: "20px",
     alignItems: "start",
-    maxWidth: "1200px",
     padding: "0 8px",
   },
   formCard: {
