@@ -168,10 +168,10 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-[70]">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
+      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Fixed */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               {editMode ? "Edit Project" : "Add New Project"}
@@ -190,10 +190,10 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
           </button>
         </div>
 
-        <div className="flex">
-          {/* Form Section */}
-          <div className="flex-1 p-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <form onSubmit={handleSubmit}>
+            <div className="p-6 pb-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -372,23 +372,33 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                   </div>
                 </div>
               </div>
+              {/* Add some bottom padding to ensure content doesn't hide behind sticky buttons */}
+              <div className="h-6"></div>
+            </div>
+          </form>
+        </div>
 
-              {/* Form Actions */}
-              <div className="flex gap-3 pt-6">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    editMode ? "Save Changes" : "Save Project"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+        {/* Sticky Bottom Actions */}
+        <div className="flex gap-3 p-6 border-t border-gray-200 bg-white flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            onClick={handleSubmit}
+            className="flex-1 bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              editMode ? "Save Changes" : "Save Project"
+            )}
+          </button>
         </div>
       </div>
     </div>
