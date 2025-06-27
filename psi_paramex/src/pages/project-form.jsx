@@ -162,10 +162,10 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
+      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Fixed */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               {editMode ? "Edit Project" : "Add New Project"}
@@ -184,9 +184,9 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
           </button>
         </div>
 
-        <div className="flex">
-          {/* Form Section */}
-          <div className="flex-1 p-6">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -367,12 +367,19 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                 </div>
               </div>
 
-              {/* Form Actions */}
-              <div className="flex gap-3 pt-6">
+              {/* Form Actions - Fixed at bottom */}
+              <div className="flex gap-3 pt-6 border-t border-gray-200 bg-white sticky bottom-0">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
