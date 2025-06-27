@@ -185,9 +185,9 @@ export default function ProjectManagementPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center">
-          <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600">Loading projects...</p>
+        <div className="flex flex-col items-center justify-center min-h-[70vh]">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading projects...</p>
         </div>
       </Layout>
     );
@@ -196,14 +196,14 @@ export default function ProjectManagementPage() {
   if (error) {
     return (
       <Layout>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
-          <h2 className="text-lg font-semibold text-red-600">
+        <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">
             Error Loading Projects
           </h2>
-          <p className="text-sm text-gray-500">{error}</p>
+          <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
           >
             Retry
           </button>

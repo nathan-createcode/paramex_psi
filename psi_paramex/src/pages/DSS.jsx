@@ -221,9 +221,9 @@ const DSS = () => {
   if (loading) {
     return (
       <Layout>
-        <div style={styles.loadingContainer}>
-          <div style={styles.spinner}></div>
-          <p>Loading DSS...</p>
+        <div className="flex flex-col items-center justify-center min-h-[70vh]">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading DSS...</p>
         </div>
       </Layout>
     )

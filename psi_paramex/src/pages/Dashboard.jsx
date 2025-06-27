@@ -562,9 +562,9 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[50vh]">
-          <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p>Loading dashboard...</p>
+        <div className="flex flex-col items-center justify-center min-h-[70vh]">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading dashboard...</p>
         </div>
       </Layout>
     )
@@ -573,12 +573,12 @@ const Dashboard = () => {
   if (error) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-          <h2>Error Loading Dashboard</h2>
-          <p>{error}</p>
+        <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 mt-4 bg-blue-500 text-white border-none rounded-lg cursor-pointer"
+            className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
           >
             Retry
           </button>
