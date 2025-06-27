@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Calendar,
@@ -8,7 +8,9 @@ import {
   Clock,
   BarChart3,
   Circle,
+  ChevronDown,
 } from "lucide-react";
+import Dropdown from "../components/ui/dropdown";
 import { supabase } from "../supabase/supabase";
 
 export function ProjectForm({ onClose, onSubmit, loading, initialData = null, editMode = false }) {
@@ -288,19 +290,19 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                     Difficulty
                   </label>
                   <div className="relative">
-                    <BarChart3 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <select
-                      name="difficulty"
+                    <BarChart3 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                    <Dropdown
                       value={formData.difficulty}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
-                      required
-                    >
-                      <option value="">Select difficulty</option>
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                    </select>
+                      onChange={(value) => handleChange({ target: { name: "difficulty", value } })}
+                      options={[
+                        { value: "Low", label: "Low" },
+                        { value: "Medium", label: "Medium" },
+                        { value: "High", label: "High" }
+                      ]}
+                      placeholder="Select difficulty"
+                      variant="form"
+                      className="w-full pl-10"
+                    />
                   </div>
                 </div>
 
@@ -309,32 +311,19 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                     Project Type
                   </label>
                   <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <select
-                      name="type"
+                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                    <Dropdown
                       value={formData.type}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
-                      required
+                      onChange={(value) => handleChange({ target: { name: "type", value } })}
+                      options={typeOptions.map(type => ({
+                        value: type.type_id,
+                        label: type.type_name
+                      }))}
+                      placeholder={typeLoading ? "Loading types..." : "Select Project type"}
+                      variant="form"
                       disabled={typeLoading || !!typeError}
-                    >
-                      <option value="">
-                        {typeLoading ? "Loading types..." : "Select Project type"}
-                      </option>
-                      {typeError && (
-                        <option value="" disabled>
-                          {typeError}
-                        </option>
-                      )}
-                      {typeOptions.map((type) => (
-                        <option 
-                          key={type.type_id} 
-                          value={type.type_id}
-                        >
-                          {type.type_name}
-                        </option>
-                      ))}
-                    </select>
+                      className="w-full pl-10"
+                    />
                   </div>
                 </div>
 
@@ -343,32 +332,19 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                     Status
                   </label>
                   <div className="relative">
-                    <Circle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <select
-                      name="status"
+                    <Circle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                    <Dropdown
                       value={formData.status}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
-                      required
+                      onChange={(value) => handleChange({ target: { name: "status", value } })}
+                      options={statusOptions.map(status => ({
+                        value: status.status_id,
+                        label: status.status_name
+                      }))}
+                      placeholder={statusLoading ? "Loading statuses..." : "Select Project status"}
+                      variant="form"
                       disabled={statusLoading || !!statusError}
-                    >
-                      <option value="">
-                        {statusLoading ? "Loading statuses..." : "Select Project status"}
-                      </option>
-                      {statusError && (
-                        <option value="" disabled>
-                          {statusError}
-                        </option>
-                      )}
-                      {statusOptions.map((status) => (
-                        <option 
-                          key={status.status_id} 
-                          value={status.status_id}
-                        >
-                          {status.status_name}
-                        </option>
-                      ))}
-                    </select>
+                      className="w-full pl-10"
+                    />
                   </div>
                 </div>
               </div>

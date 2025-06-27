@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
+import { ChevronDown } from "lucide-react"
+import Dropdown from "../components/ui/dropdown"
 
 const Settings = () => {
   const [loading, setLoading] = useState(true)
@@ -103,15 +105,17 @@ const Settings = () => {
                   <label className="text-base font-medium text-gray-900 block mb-1">Theme</label>
                   <p className="text-sm text-gray-600">Choose your preferred color scheme</p>
                 </div>
-                <select
+                <Dropdown
                   value={settings.theme}
-                  onChange={(e) => handleSettingChange("theme", e.target.value)}
-                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
-                >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                  <option value="system">System</option>
-                </select>
+                  onChange={(value) => handleSettingChange("theme", value)}
+                  options={[
+                    { value: "light", label: "Light" },
+                    { value: "dark", label: "Dark" },
+                    { value: "system", label: "System" }
+                  ]}
+                  placeholder="Select theme"
+                  className="min-w-[150px]"
+                />
               </div>
 
               <div className="flex justify-between items-center">
@@ -119,15 +123,17 @@ const Settings = () => {
                   <label className="text-base font-medium text-gray-900 block mb-1">Default View</label>
                   <p className="text-sm text-gray-600">Choose which page to show when you log in</p>
                 </div>
-                <select
+                <Dropdown
                   value={settings.defaultView}
-                  onChange={(e) => handleSettingChange("defaultView", e.target.value)}
-                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
-                >
-                  <option value="dashboard">Dashboard</option>
-                  <option value="projects">Projects</option>
-                  <option value="dss">DSS & AI</option>
-                </select>
+                  onChange={(value) => handleSettingChange("defaultView", value)}
+                  options={[
+                    { value: "dashboard", label: "Dashboard" },
+                    { value: "projects", label: "Projects" },
+                    { value: "dss", label: "DSS & AI" }
+                  ]}
+                  placeholder="Select view"
+                  className="min-w-[150px]"
+                />
               </div>
             </div>
           </div>
@@ -235,16 +241,18 @@ const Settings = () => {
                   <label className="text-base font-medium text-gray-900 block mb-1">Language</label>
                   <p className="text-sm text-gray-600">Choose your preferred language</p>
                 </div>
-                <select
+                <Dropdown
                   value={settings.language}
-                  onChange={(e) => handleSettingChange("language", e.target.value)}
-                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
-                >
-                  <option value="en">English</option>
-                  <option value="id">Bahasa Indonesia</option>
-                  <option value="es">Español</option>
-                  <option value="fr">Français</option>
-                </select>
+                  onChange={(value) => handleSettingChange("language", value)}
+                  options={[
+                    { value: "en", label: "English" },
+                    { value: "id", label: "Bahasa Indonesia" },
+                    { value: "es", label: "Español" },
+                    { value: "fr", label: "Français" }
+                  ]}
+                  placeholder="Select language"
+                  className="min-w-[150px]"
+                />
               </div>
 
               <div className="flex justify-between items-center">
@@ -252,16 +260,18 @@ const Settings = () => {
                   <label className="text-base font-medium text-gray-900 block mb-1">Timezone</label>
                   <p className="text-sm text-gray-600">Set your local timezone</p>
                 </div>
-                <select
+                <Dropdown
                   value={settings.timezone}
-                  onChange={(e) => handleSettingChange("timezone", e.target.value)}
-                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
-                >
-                  <option value="UTC">UTC</option>
-                  <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
-                  <option value="America/New_York">America/New_York (EST)</option>
-                  <option value="Europe/London">Europe/London (GMT)</option>
-                </select>
+                  onChange={(value) => handleSettingChange("timezone", value)}
+                  options={[
+                    { value: "UTC", label: "UTC" },
+                    { value: "Asia/Jakarta", label: "Asia/Jakarta (WIB)" },
+                    { value: "America/New_York", label: "America/New_York (EST)" },
+                    { value: "Europe/London", label: "Europe/London (GMT)" }
+                  ]}
+                  placeholder="Select timezone"
+                  className="min-w-[150px]"
+                />
               </div>
 
               <div className="flex justify-between items-center">
@@ -269,16 +279,18 @@ const Settings = () => {
                   <label className="text-base font-medium text-gray-900 block mb-1">Currency</label>
                   <p className="text-sm text-gray-600">Default currency for payments</p>
                 </div>
-                <select
+                <Dropdown
                   value={settings.currency}
-                  onChange={(e) => handleSettingChange("currency", e.target.value)}
-                  className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none min-w-[150px]"
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="IDR">IDR (Rp)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                </select>
+                  onChange={(value) => handleSettingChange("currency", value)}
+                  options={[
+                    { value: "USD", label: "USD ($)" },
+                    { value: "IDR", label: "IDR (Rp)" },
+                    { value: "EUR", label: "EUR (€)" },
+                    { value: "GBP", label: "GBP (£)" }
+                  ]}
+                  placeholder="Select currency"
+                  className="min-w-[150px]"
+                />
               </div>
             </div>
           </div>

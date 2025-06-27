@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
+import { ChevronDown } from "lucide-react"
+import Dropdown from "../components/ui/dropdown"
 
 const DSS = () => {
   const [projects, setProjects] = useState([])
@@ -392,15 +394,17 @@ const DSS = () => {
               {/* Project Selection */}
               <div style={styles.projectSelection}>
                 <label style={styles.selectLabel}>Projects to Analyze</label>
-                <select
+                <Dropdown
                   value={selectedProjects}
-                  onChange={(e) => setSelectedProjects(e.target.value)}
-                  style={styles.select}
-                >
-                  <option value="all">All Active Projects</option>
-                  <option value="On-Plan">On-Plan Projects</option>
-                  <option value="On-Process">On-Process Projects</option>
-                </select>
+                  onChange={(value) => setSelectedProjects(value)}
+                  options={[
+                    { value: "all", label: "All Active Projects" },
+                    { value: "On-Plan", label: "On-Plan Projects" },
+                    { value: "On-Process", label: "On-Process Projects" }
+                  ]}
+                  placeholder="Select projects"
+                  className="w-full"
+                />
               </div>
 
               {/* Calculate Button */}
@@ -634,6 +638,8 @@ const styles = {
     borderRadius: "0",
     boxShadow: "none",
     overflow: "visible",
+    position: "relative",
+    zIndex: 1,
   },
   resultsCard: {
     backgroundColor: "transparent",
@@ -662,7 +668,7 @@ const styles = {
   cardContent: {
     padding: "0",
     flex: 1,
-    overflow: "hidden",
+    overflow: "visible",
     display: "flex",
     flexDirection: "column",
   },
@@ -739,6 +745,8 @@ const styles = {
   projectSelection: {
     marginBottom: "20px",
     padding: "0 8px",
+    position: "relative",
+    zIndex: 10,
   },
   selectLabel: {
     display: "block",
