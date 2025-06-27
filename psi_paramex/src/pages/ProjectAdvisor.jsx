@@ -6,19 +6,39 @@ import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
 
 const ProjectAdvisor = () => {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "ai",
-      content:
-        "Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization. What would you like to discuss today?",
-      timestamp: new Date(),
-    },
-  ])
+  // Load messages from localStorage or use default
+  const [messages, setMessages] = useState(() => {
+    try {
+      const savedMessages = localStorage.getItem('projectAdvisorMessages')
+      if (savedMessages) {
+        const parsedMessages = JSON.parse(savedMessages)
+        // Convert timestamp strings back to Date objects
+        return parsedMessages.map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }
+    } catch (error) {
+      console.error('Error loading saved messages:', error)
+    }
+    
+    // Default message if no saved messages or error
+    return [
+      {
+        id: 1,
+        type: "ai",
+        content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I'm connected to advanced AI capabilities to provide you with intelligent, personalized advice. What would you like to discuss today?",
+        timestamp: new Date(),
+      },
+    ]
+  })
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [isRevealing, setIsRevealing] = useState(false)
+  const [revealingMessageId, setRevealingMessageId] = useState(null)
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef(null)
+  const typewriterTimeoutRef = useRef(null)
   const navigate = useNavigate()
 
   // Authentication check
@@ -52,28 +72,101 @@ const ProjectAdvisor = () => {
     scrollToBottom()
   }, [messages])
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (typewriterTimeoutRef.current) {
+        clearTimeout(typewriterTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Save messages to localStorage whenever messages change
+  useEffect(() => {
+    try {
+      localStorage.setItem('projectAdvisorMessages', JSON.stringify(messages))
+    } catch (error) {
+      console.error('Error saving messages to localStorage:', error)
+    }
+  }, [messages])
+
+  // Function to clear chat history
+  const clearChatHistory = () => {
+    const defaultMessage = {
+      id: 1,
+      type: "ai",
+      content: "Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization.",
+      timestamp: new Date(),
+    }
+    setMessages([defaultMessage])
+    localStorage.removeItem('projectAdvisorMessages')
+  }
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // Simulate AI response
-  const generateAIResponse = () => {
-    const responses = [
-      "Based on your project requirements, I recommend breaking down the task into smaller, manageable chunks. This approach will help you maintain momentum and track progress more effectively.",
-      "For better project prioritization, consider using the Eisenhower Matrix: categorize tasks by urgency and importance. Focus on important and urgent tasks first.",
-      "Time management tip: Try the Pomodoro Technique - work for 25 minutes, then take a 5-minute break. This can significantly improve your focus and productivity.",
-      "When dealing with difficult clients, clear communication is key. Set expectations early, provide regular updates, and document all agreements in writing.",
-      "For project estimation, use the three-point estimation method: calculate optimistic, pessimistic, and most likely scenarios, then use the weighted average.",
-      "Consider implementing a project buffer - add 20-30% extra time to your estimates to account for unexpected challenges and scope changes.",
-      "Regular project reviews are crucial. Schedule weekly check-ins to assess progress, identify blockers, and adjust timelines as needed.",
-      "To improve client satisfaction, provide value beyond the basic requirements. Small extras and proactive communication can lead to repeat business and referrals.",
-    ]
+  // Typewriter effect function
+  const typewriterEffect = (text, messageId, delay = 0.5) => {
+    return new Promise((resolve) => {
+      let currentIndex = 0
+      setIsRevealing(true)
+      setRevealingMessageId(messageId)
+      
+      const typeNextChar = () => {
+        if (currentIndex <= text.length) {
+          const partialText = text.substring(0, currentIndex)
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, content: partialText, isRevealing: currentIndex < text.length }
+              : msg
+          ))
+          
+          currentIndex++
+          
+          if (currentIndex <= text.length) {
+            typewriterTimeoutRef.current = setTimeout(typeNextChar, delay)
+          } else {
+            setIsRevealing(false)
+            setRevealingMessageId(null)
+            resolve()
+          }
+        }
+      }
+      
+      typeNextChar()
+    })
+  }
 
-    return responses[Math.floor(Math.random() * responses.length)]
+  // Call Groq AI API for real AI responses
+  const generateAIResponse = async (userMessage, conversationHistory) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          conversation_history: conversationHistory
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data.response
+    } catch (error) {
+      console.error('Error calling AI API:', error)
+      return "I apologize, but I'm currently unable to connect to my AI brain. Please check that the backend server is running and try again. In the meantime, I recommend breaking your project into smaller, manageable tasks for better organization."
+    }
   }
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() || isTyping) return
 
     const userMessage = {
       id: Date.now(),
@@ -83,24 +176,51 @@ const ProjectAdvisor = () => {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const messageText = inputMessage.trim()
     setInputMessage("")
     setIsTyping(true)
 
-    // Simulate AI thinking time
-    setTimeout(
-      () => {
-        const aiResponse = {
-          id: Date.now() + 1,
-          type: "ai",
-          content: generateAIResponse(),
-          timestamp: new Date(),
-        }
+    try {
+      // Get AI response from Groq API
+      const aiResponseContent = await generateAIResponse(messageText, messages)
+      
+      // Create initial empty AI message
+      const aiResponseId = Date.now() + 1
+      const aiResponse = {
+        id: aiResponseId,
+        type: "ai",
+        content: "",
+        timestamp: new Date(),
+        isRevealing: true,
+      }
 
-        setMessages((prev) => [...prev, aiResponse])
-        setIsTyping(false)
-      },
-      1500 + Math.random() * 1000,
-    ) // Random delay between 1.5-2.5 seconds
+      // Add empty message first
+      setMessages((prev) => [...prev, aiResponse])
+      setIsTyping(false)
+
+      // Start typewriter effect
+      await typewriterEffect(aiResponseContent, aiResponseId)
+      
+    } catch (error) {
+      console.error('Error getting AI response:', error)
+      const errorResponseId = Date.now() + 1
+      const errorResponse = {
+        id: errorResponseId,
+        type: "ai",
+        content: "",
+        timestamp: new Date(),
+        isRevealing: true,
+      }
+      
+      setMessages((prev) => [...prev, errorResponse])
+      setIsTyping(false)
+      
+      // Type out error message
+      await typewriterEffect(
+        "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        errorResponseId
+      )
+    }
   }
 
   const handleKeyPress = (e) => {
@@ -119,8 +239,61 @@ const ProjectAdvisor = () => {
     "Best practices for freelance project management?",
   ]
 
-  const handleQuickQuestion = (question) => {
-    setInputMessage(question)
+  const handleQuickQuestion = async (question) => {
+    if (isTyping || isRevealing) return
+    
+    // Immediately send the quick question
+    const userMessage = {
+      id: Date.now(),
+      type: "user",
+      content: question,
+      timestamp: new Date(),
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setIsTyping(true)
+
+    try {
+      // Get AI response for quick question
+      const aiResponseContent = await generateAIResponse(question, messages)
+      
+      // Create initial empty AI message
+      const aiResponseId = Date.now() + 1
+      const aiResponse = {
+        id: aiResponseId,
+        type: "ai",
+        content: "",
+        timestamp: new Date(),
+        isRevealing: true,
+      }
+
+      // Add empty message first
+      setMessages((prev) => [...prev, aiResponse])
+      setIsTyping(false)
+
+      // Start typewriter effect
+      await typewriterEffect(aiResponseContent, aiResponseId)
+
+    } catch (error) {
+      console.error('Error getting AI response for quick question:', error)
+      const errorResponseId = Date.now() + 1
+      const errorResponse = {
+        id: errorResponseId,
+        type: "ai",
+        content: "",
+        timestamp: new Date(),
+        isRevealing: true,
+      }
+      
+      setMessages((prev) => [...prev, errorResponse])
+      setIsTyping(false)
+      
+      // Type out error message
+      await typewriterEffect(
+        "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        errorResponseId
+      )
+    }
   }
 
   if (loading) {
@@ -136,7 +309,7 @@ const ProjectAdvisor = () => {
 
   return (
     <Layout>
-      <div style={styles.container}>
+      <div className="max-w-7xl mx-auto" style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerContent}>
@@ -146,10 +319,6 @@ const ProjectAdvisor = () => {
                 AI Project Advisor
               </h1>
               <p style={styles.subtitle}>Get intelligent advice for your freelance project management challenges</p>
-            </div>
-            <div style={styles.statusIndicator}>
-              <div style={styles.statusDot}></div>
-              <span style={styles.statusText}>AI Online</span>
             </div>
           </div>
         </div>
@@ -178,7 +347,9 @@ const ProjectAdvisor = () => {
                       ...(message.type === "user" ? styles.userMessage : styles.aiMessage),
                     }}
                   >
-                    <p style={styles.messageContent}>{message.content}</p>
+                    <p style={styles.messageContent}>
+                      {message.content}
+                    </p>
                     <span style={styles.messageTime}>
                       {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
@@ -192,8 +363,8 @@ const ProjectAdvisor = () => {
               </div>
             ))}
 
-            {/* Typing Indicator */}
-            {isTyping && (
+            {/* Typing Indicator - only show when waiting for AI response, not during reveal */}
+            {isTyping && !isRevealing && (
               <div style={styles.messageWrapper}>
                 <div style={styles.messageGroup}>
                   <div style={styles.aiAvatar}>
@@ -201,9 +372,9 @@ const ProjectAdvisor = () => {
                   </div>
                   <div style={{ ...styles.messageBubble, ...styles.aiMessage }}>
                     <div style={styles.typingIndicator}>
-                      <div style={styles.typingDot}></div>
-                      <div style={styles.typingDot}></div>
-                      <div style={styles.typingDot}></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
                     </div>
                   </div>
                 </div>
@@ -219,7 +390,18 @@ const ProjectAdvisor = () => {
               <h3 style={styles.quickQuestionsTitle}>Quick Questions</h3>
               <div style={styles.quickQuestionsList}>
                 {quickQuestions.map((question, index) => (
-                  <button key={index} onClick={() => handleQuickQuestion(question)} style={styles.quickQuestionButton}>
+                  <button 
+                    key={index} 
+                    onClick={() => handleQuickQuestion(question)} 
+                    style={styles.quickQuestionButton} 
+                    className="quickQuestionButton"
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#F3F4F6'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#F9FAFB'
+                    }}
+                  >
                     {question}
                   </button>
                 ))}
@@ -230,6 +412,20 @@ const ProjectAdvisor = () => {
           {/* Input Area */}
           <div style={styles.inputContainer}>
             <div style={styles.inputWrapper}>
+              <button 
+                onClick={clearChatHistory} 
+                style={styles.clearButtonLeft}
+                className="clearButton"
+                title="Clear chat history"
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#2563EB'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#3B82F6'
+                }}
+              >
+                <ClearIcon />
+              </button>
               <textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
@@ -237,7 +433,7 @@ const ProjectAdvisor = () => {
                 placeholder="Ask me anything about project management..."
                 style={styles.messageInput}
                 rows={1}
-                disabled={isTyping}
+                disabled={false}
               />
               <button
                 onClick={handleSendMessage}
@@ -246,11 +442,27 @@ const ProjectAdvisor = () => {
                   ...styles.sendButton,
                   ...(!inputMessage.trim() || isTyping ? styles.sendButtonDisabled : {}),
                 }}
+                onMouseEnter={(e) => {
+                  if (!(!inputMessage.trim() || isTyping)) {
+                    e.target.style.backgroundColor = '#2563EB'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!(!inputMessage.trim() || isTyping)) {
+                    e.target.style.backgroundColor = '#3B82F6'
+                  }
+                }}
               >
                 <SendIcon />
               </button>
             </div>
-            <p style={styles.inputHint}>Press Enter to send, Shift + Enter for new line</p>
+            <p style={styles.inputHint}>
+              {isTyping || isRevealing ? (
+                <>AI is responding... You can still type your next message. <strong>Chat history saved locally</strong></>
+              ) : (
+                <>Press Enter to send, Shift + Enter for new line, <strong>Chat history saved locally</strong></>
+              )}
+            </p>
           </div>
         </div>
       </div>
@@ -284,10 +496,16 @@ const SendIcon = () => (
   </svg>
 )
 
+const ClearIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M18 6L6 18" />
+    <path d="M6 6l12 12" />
+  </svg>
+)
+
 const styles = {
   container: {
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-    height: "calc(100vh - 48px)",
     display: "flex",
     flexDirection: "column",
   },
@@ -308,11 +526,7 @@ const styles = {
     marginBottom: "16px",
   },
   header: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    padding: "24px 32px",
     marginBottom: "24px",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
   },
   headerContent: {
     display: "flex",
@@ -336,35 +550,16 @@ const styles = {
     color: "#6b7280",
     margin: 0,
   },
-  statusIndicator: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px 16px",
-    backgroundColor: "#ECFDF5",
-    borderRadius: "20px",
-    border: "1px solid #A7F3D0",
-  },
-  statusDot: {
-    width: "8px",
-    height: "8px",
-    backgroundColor: "#10B981",
-    borderRadius: "50%",
-    animation: "pulse 2s infinite",
-  },
-  statusText: {
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#059669",
-  },
   chatContainer: {
-    flex: 1,
-    backgroundColor: "white",
-    borderRadius: "24px",
+    backgroundColor: "transparent",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    maxWidth: "900px", // Increased from 700px for better screen utilization
+    width: "100%", // Full width of parent
+    margin: "0 auto",
+    height: "calc(100vh - 240px)", // Responsive height based on viewport (reduced padding)
+    minHeight: "750px", // Increased minimum height
   },
   messagesContainer: {
     flex: 1,
@@ -373,6 +568,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "16px",
+    minHeight: 0, // Allow flex shrinking
   },
   messageWrapper: {
     display: "flex",
@@ -382,7 +578,7 @@ const styles = {
     display: "flex",
     alignItems: "flex-end",
     gap: "12px",
-    maxWidth: "80%",
+    maxWidth: "80%", // Increased from 70% for wider messages
   },
   aiAvatar: {
     width: "32px",
@@ -441,11 +637,11 @@ const styles = {
     height: "8px",
     backgroundColor: "#6B7280",
     borderRadius: "50%",
-    animation: "typing 1.4s infinite ease-in-out",
   },
   quickQuestionsContainer: {
     padding: "24px",
-    borderTop: "1px solid #F3F4F6",
+    flexShrink: 0, // Prevent quick questions from shrinking
+    backgroundColor: "transparent", // Transparent background
   },
   quickQuestionsTitle: {
     fontSize: "16px",
@@ -455,8 +651,8 @@ const styles = {
   },
   quickQuestionsList: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: "12px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", // Increased minimum width
+    gap: "16px", // Increased gap for better spacing
   },
   quickQuestionButton: {
     padding: "12px 16px",
@@ -472,7 +668,8 @@ const styles = {
   },
   inputContainer: {
     padding: "24px",
-    borderTop: "1px solid #F3F4F6",
+    flexShrink: 0, // Prevent input area from shrinking
+    backgroundColor: "transparent", // Transparent background
   },
   inputWrapper: {
     display: "flex",
@@ -513,6 +710,20 @@ const styles = {
     margin: "8px 0 0 0",
     textAlign: "center",
   },
+  clearButtonLeft: {
+    padding: "12px",
+    backgroundColor: "#3B82F6",
+    color: "white",
+    border: "none",
+    borderRadius: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.2s",
+    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    flexShrink: 0,
+  },
 }
 
 // Add CSS animations
@@ -530,8 +741,23 @@ styleSheet.innerText = `
   }
 
   @keyframes typing {
-    0%, 60%, 100% { transform: translateY(0); }
-    30% { transform: translateY(-10px); }
+    0% { 
+      transform: translateY(0); 
+    }
+    50% { 
+      transform: translateY(-8px); 
+    }
+    100% { 
+      transform: translateY(0); 
+    }
+  }
+
+  .typing-dot {
+    animation: typing 0.8s infinite ease-in-out;
+  }
+
+  .typing-dot:nth-child(1) {
+    animation-delay: 0s;
   }
 
   .typing-dot:nth-child(2) {
@@ -540,6 +766,14 @@ styleSheet.innerText = `
 
   .typing-dot:nth-child(3) {
     animation-delay: 0.4s;
+  }
+
+  .clearButton:hover {
+    background-color: #2563EB;
+  }
+
+  .quickQuestionButton:hover {
+    background-color: #F3F4F6;
   }
 `
 document.head.appendChild(styleSheet)

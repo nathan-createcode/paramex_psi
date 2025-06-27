@@ -7,6 +7,7 @@ import Layout from "../components/Layout";
 import ProjectTable from "../components/project-man-comp/project-table";
 import SearchAndFilters from "../components/project-man-comp/search-filter";
 import { filterProjects, formatDate } from "../utils/project-utils";
+import { insertProjectAuto } from "../utils/simple-insert";
 import { ProjectForm } from "./project-form";
 import { Trash2, Pencil } from "lucide-react";
 
@@ -38,6 +39,10 @@ export default function ProjectManagementPage() {
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: 'asc'
+  });
 
   // Check authentication and fetch projects
   useEffect(() => {
@@ -112,9 +117,64 @@ export default function ProjectManagementPage() {
     }
   };
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   const filteredProjects = useMemo(() => {
-    return filterProjects(projects, searchQuery, filters);
-  }, [projects, searchQuery, filters]);
+    const filtered = filterProjects(projects, searchQuery, filters);
+    
+    // Apply sorting if sortConfig is set
+    if (sortConfig.key) {
+      const sorted = [...filtered].sort((a, b) => {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+        
+        // Handle null or undefined values
+        if (aValue == null && bValue == null) return 0;
+        if (aValue == null) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (bValue == null) return sortConfig.direction === 'asc' ? 1 : -1;
+        
+        // Handle date sorting (for startDate and deadline)
+        if (sortConfig.key === 'startDate' || sortConfig.key === 'deadline') {
+          const dateA = new Date(aValue);
+          const dateB = new Date(bValue);
+          const comparison = dateA.getTime() - dateB.getTime();
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        // Handle numeric sorting (for payment)
+        if (sortConfig.key === 'payment') {
+          const numA = parseFloat(aValue) || 0;
+          const numB = parseFloat(bValue) || 0;
+          const comparison = numA - numB;
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        // Handle string comparison (for name, client, type, difficulty, status)
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          const comparison = aValue.toLowerCase().localeCompare(bValue.toLowerCase());
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        // Fallback comparison
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+      return sorted;
+    }
+    
+    return filtered;
+  }, [projects, searchQuery, filters, sortConfig]);
 
   const displayProjects = filteredProjects.map((project) => ({
     ...project,
@@ -154,192 +214,174 @@ export default function ProjectManagementPage() {
 
   return (
     <Layout>
-      <div className="min-h-screen px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Project Management
-            </h1>
-            <p className="text-gray-600">
-              Manage and track all your freelance projects
-            </p>
-          </div>
-
-          <SearchAndFilters
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            filters={filters}
-            onFiltersChange={setFilters}
-            onAddProject={() => {
-              setFormError(null);
-              setFormSuccess(null);
-              setShowProjectForm(true);
-            }}
-          />
-
-          {formSuccess && (
-            <div className="mb-4 p-3 rounded-lg bg-green-100 text-green-800 border border-green-200">
-              {formSuccess}
-            </div>
-          )}
-          {formError && (
-            <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-800 border border-red-200">
-              {formError}
-            </div>
-          )}
-
-          <ProjectTable
-            projects={displayProjects}
-            // onRowClick={async (project) => {
-            //   setEditFormLoading(true);
-            //   setEditProjectId(project.id);
-            //   setShowEditForm(true);
-            //   setEditProjectData(null);
-            //   try {
-            //     // Fetch latest project data by ID from Supabase
-            //     const { data, error } = await supabase
-            //       .from("projects")
-            //       .select("*")
-            //       .eq("project_id", project.id)
-            //       .single();
-            //     if (error) throw error;
-            //     setEditProjectData({
-            //       id: data.project_id,
-            //       name: data.project_name,
-            //       client: data.client_name,
-            //       startDate: data.start_date,
-            //       deadline: data.deadline,
-            //       payment: data.payment_amount,
-            //       difficulty: data.difficulty_level,
-            //       type: data.type_id,
-            //     });
-            //   } catch {
-            //     setFormError("Failed to load project data for editing.");
-            //     setShowEditForm(false);
-            //   } finally {
-            //     setEditFormLoading(false);
-            //   }
-            // }}
-            onContextAction={(project, position) => {
-              setContextMenu({
-                visible: true,
-                x: position.x,
-                y: position.y,
-                project,
-              });
-            }}
-          />
-
-          <div className="mt-6 text-sm text-gray-500">
-            Showing {filteredProjects.length} of {projects.length} projects
-          </div>
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Project Management
+          </h1>
+          <p className="text-gray-600">
+            Manage and track all your freelance projects
+          </p>
         </div>
-        {showProjectForm && (
-          <ProjectForm
-            onClose={() => setShowProjectForm(false)}
-            loading={formLoading}
-            onSubmit={async (formData) => {
-              console.log("userId:", userId);
-              console.log("formData:", formData);
 
-              setFormError(null);
-              setFormSuccess(null);
-              setFormLoading(true);
-              try {
-                // Validasi sederhana (bisa dikembangkan sesuai kebutuhan)
-                if (!userId) throw new Error("User not authenticated");
-                if (
-                  !formData.name ||
-                  !formData.client ||
-                  !formData.startDate ||
-                  !formData.deadline ||
-                  !formData.payment === "" ||
-                  !formData.difficulty ||
-                  !formData.type
-                ) {
-                  throw new Error("Please fill in all required fields.");
-                }
-                // Insert ke Supabase
-                const { error } = await supabase.from("projects").insert([
-                  {
-                    user_id: userId,
-                    project_name: formData.name,
-                    client_name: formData.client,
-                    start_date: formData.startDate,
-                    deadline: formData.deadline,
-                    payment_amount: formData.payment,
-                    difficulty_level: formData.difficulty,
-                    type_id: formData.type,
-                    status_id: "1", // default status
-                  },
-                ]);
-                if (error) throw error;
-                setFormSuccess("Project successfully added!");
-                setShowProjectForm(false);
-                await fetchProjects(userId);
-              } catch (err) {
-                setFormError(err.message || "Failed to add project.");
-              } finally {
-                setFormLoading(false);
-              }
-            }}
-          />
+        <SearchAndFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onAddProject={() => {
+            setFormError(null);
+            setFormSuccess(null);
+            setShowProjectForm(true);
+          }}
+        />
+
+        {formSuccess && (
+          <div className="mb-4 p-3 rounded-lg bg-green-100 text-green-800 border border-green-200">
+            {formSuccess}
+          </div>
         )}
-        {showEditForm && (
-          <ProjectForm
-            onClose={() => {
+        {formError && (
+          <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-800 border border-red-200">
+            {formError}
+          </div>
+        )}
+
+        <ProjectTable
+          projects={displayProjects}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          onContextAction={(project, position) => {
+            setContextMenu({
+              visible: true,
+              x: position.x,
+              y: position.y,
+              project,
+            });
+          }}
+        />
+
+        <div className="mt-6 text-sm text-gray-500">
+          Showing {filteredProjects.length} of {projects.length} projects
+        </div>
+      </div>
+
+      {showProjectForm && (
+        <ProjectForm
+          onClose={() => setShowProjectForm(false)}
+          loading={formLoading}
+          onSubmit={async (formData) => {
+            console.log("userId:", userId);
+            console.log("formData:", formData);
+
+            setFormError(null);
+            setFormSuccess(null);
+            setFormLoading(true);
+            try {
+              // Validasi sederhana (bisa dikembangkan sesuai kebutuhan)
+              if (!userId) throw new Error("User not authenticated");
+              if (
+                !formData.name ||
+                !formData.client ||
+                !formData.startDate ||
+                !formData.deadline ||
+                formData.payment === "" ||
+                !formData.difficulty ||
+                !formData.type ||
+                !formData.status
+              ) {
+                throw new Error("Please fill in all required fields.");
+              }
+              // Insert ke Supabase
+              const projectData = {
+                user_id: userId,
+                project_name: formData.name,
+                client_name: formData.client,
+                start_date: formData.startDate,
+                deadline: formData.deadline,
+                payment_amount: formData.payment,
+                difficulty_level: formData.difficulty,
+                type_id: formData.type,
+                status_id: formData.status,
+              };
+
+              console.log("Inserting project with simple method:", projectData);
+
+              // Use simple insert method - no SQL needed!
+              const result = await insertProjectAuto(projectData);
+              
+              if (!result.success) {
+                throw new Error(result.error || "Failed to insert project");
+              }
+              
+              console.log("Successfully inserted project:", result.data);
+              setFormSuccess("Project successfully added!");
+              setShowProjectForm(false);
+              await fetchProjects(userId);
+            } catch (err) {
+              setFormError(err.message || "Failed to add project.");
+            } finally {
+              setFormLoading(false);
+            }
+          }}
+        />
+      )}
+      {showEditForm && (
+        <ProjectForm
+          onClose={() => {
+            setShowEditForm(false);
+            setEditProjectId(null);
+            setEditProjectData(null);
+          }}
+          loading={editFormLoading}
+          editMode={true}
+          initialData={editProjectData}
+          onSubmit={async (formData) => {
+            setFormError(null);
+            setFormSuccess(null);
+            setEditFormLoading(true);
+            try {
+              if (!userId) throw new Error("User not authenticated");
+              if (
+                !formData.name ||
+                !formData.client ||
+                !formData.startDate ||
+                !formData.deadline ||
+                formData.payment === "" ||
+                !formData.difficulty ||
+                !formData.type ||
+                !formData.status
+              ) {
+                throw new Error("Please fill in all required fields.");
+              }
+              // Update project in Supabase
+              const { error } = await supabase
+                .from("projects")
+                .update({
+                  project_name: formData.name,
+                  client_name: formData.client,
+                  start_date: formData.startDate,
+                  deadline: formData.deadline,
+                  payment_amount: formData.payment,
+                  difficulty_level: formData.difficulty,
+                  type_id: formData.type,
+                  status_id: formData.status,
+                })
+                .eq("project_id", editProjectId);
+              if (error) throw error;
+              setFormSuccess("Project successfully updated!");
               setShowEditForm(false);
               setEditProjectId(null);
               setEditProjectData(null);
-            }}
-            loading={editFormLoading}
-            editMode={true}
-            initialData={editProjectData}
-            onSubmit={async (formData) => {
-              setFormError(null);
-              setFormSuccess(null);
-              setEditFormLoading(true);
-              try {
-                if (!userId) throw new Error("User not authenticated");
-                if (
-                  !formData.name ||
-                  !formData.client ||
-                  !formData.startDate ||
-                  !formData.deadline ||
-                  formData.payment === "" ||
-                  !formData.difficulty ||
-                  !formData.type
-                ) {
-                  throw new Error("Please fill in all required fields.");
-                }
-                // Update project in Supabase
-                const { error } = await supabase
-                  .from("projects")
-                  .update({
-                    project_name: formData.name,
-                    client_name: formData.client,
-                    start_date: formData.startDate,
-                    deadline: formData.deadline,
-                    payment_amount: formData.payment,
-                    difficulty_level: formData.difficulty,
-                    type_id: formData.type,
-                  })
-                  .eq("project_id", editProjectId);
-                if (error) throw error;
-                setFormSuccess("Project successfully updated!");
-                setShowEditForm(false);
-                setEditProjectId(null);
-                setEditProjectData(null);
-                await fetchProjects(userId);
-              } catch (err) {
-                setFormError(err.message || "Failed to update project.");
-              } finally {
-                setEditFormLoading(false);
-              }
-            }}
-          />
-        )}
-      </div>
+              await fetchProjects(userId);
+            } catch (err) {
+              setFormError(err.message || "Failed to update project.");
+            } finally {
+              setEditFormLoading(false);
+            }
+          }}
+        />
+      )}
 
       {contextMenu.visible && (
         <div
@@ -373,6 +415,7 @@ export default function ProjectManagementPage() {
                   payment: data.payment_amount,
                   difficulty: data.difficulty_level,
                   type: data.type_id,
+                  status: data.status_id,
                 });
               } catch (err) {
                 setFormError("Failed to load project data.");
@@ -397,6 +440,7 @@ export default function ProjectManagementPage() {
           </button>
         </div>
       )}
+
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 bg-opacity-50">
           <div className="bg-white rounded-lg shadow-md p-6 w-[90%] max-w-md">

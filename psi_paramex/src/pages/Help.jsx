@@ -68,7 +68,7 @@ const Help = () => {
         },
         {
           title: "Project Status Workflow",
-          content: "Understanding the different project statuses: On-Plan, On-Process, On-Discuss, and Done.",
+          content: "Understanding the different project statuses: On-Plan, On-Process and Done.",
         },
         {
           title: "Setting Deadlines and Priorities",
