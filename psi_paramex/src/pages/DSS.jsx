@@ -231,7 +231,7 @@ const DSS = () => {
 
   return (
     <Layout>
-      <div style={styles.container}>
+      <div className="max-w-7xl mx-auto" style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
           <div>
