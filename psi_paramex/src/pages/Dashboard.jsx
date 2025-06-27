@@ -287,6 +287,17 @@ const Dashboard = () => {
     }
   }
 
+  // Format currency function for compact display
+  const formatCurrency = (amount) => {
+    if (amount >= 1000000) {
+      return `$${(amount / 1000000).toFixed(1)}M`
+    } else if (amount >= 1000) {
+      return `$${(amount / 1000).toFixed(1)}K`
+    } else {
+      return `$${amount.toLocaleString()}`
+    }
+  }
+
   // Calculate summary data
   const summary = useMemo(() => {
     console.log("Calculating summary with projects:", projects.length)
@@ -612,8 +623,8 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Summary Cards - 6 Cards seperti di gambar */}
-        <div className="grid grid-cols-5 xl:grid-cols-5 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4 mb-8">
+        {/* Summary Cards - 5 Cards dengan responsive grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
           {[
             {
               title: "Total Projects",
@@ -645,7 +656,8 @@ const Dashboard = () => {
             },
             {
               title: "Total Earnings",
-              value: `$${summary.totalEarnings.toLocaleString()}`,
+              value: formatCurrency(summary.totalEarnings),
+              fullValue: `$${summary.totalEarnings.toLocaleString()}`,
               icon: DollarSignIcon,
               iconColor: "#10B981",
               bgColor: "bg-green-50",
@@ -653,14 +665,15 @@ const Dashboard = () => {
           ].map((item, index) => (
             <div
               key={index}
-              className="bg-white rounded-2xl p-6 flex items-center gap-4 shadow-md/5 transition-all duration-200 border border-gray-100 cursor-default"
+              className="bg-white rounded-2xl p-6 flex items-center gap-4 shadow-md/5 transition-all duration-200 border border-gray-100 cursor-default min-w-0"
+              title={item.fullValue || item.value}
             > 
-              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${item.bgColor}`}>
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${item.bgColor} flex-shrink-0`}>
                 <item.icon color={item.iconColor} />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600 mb-1">{item.title}</p>
-                <h3 className="text-2xl font-bold text-gray-900">{item.value}</h3>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-600 mb-1 truncate">{item.title}</p>
+                <h3 className="text-xl lg:text-2xl font-bold text-gray-900 truncate">{item.value}</h3>
               </div>
             </div>
           ))}
