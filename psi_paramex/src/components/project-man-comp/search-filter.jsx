@@ -45,7 +45,7 @@ export default function SearchAndFilters({
       {/* Filters and Add Button */}
       <div className="flex items-center gap-4">
         {/* Filter Dropdowns */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <FilterDropdown
             label="Status"
             options={statusOptions}
