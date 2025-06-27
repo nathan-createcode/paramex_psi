@@ -591,7 +591,7 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen p-6 font-sans">
+      <div className="max-w-7xl mx-auto">
         {/* Dynamic Welcome Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
@@ -780,7 +780,7 @@ const Dashboard = () => {
         )}
       </div>
     </Layout>
-  )
+  );
 }
 
 export default Dashboard
