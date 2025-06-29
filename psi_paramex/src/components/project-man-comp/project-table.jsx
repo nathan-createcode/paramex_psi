@@ -52,10 +52,10 @@ export default function ProjectTable({
               <tr
                 key={project.id}
                 className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  onContextAction(project, { x: e.pageX, y: e.pageY });
-                }}
+                // onContextMenu={(e) => {
+                //   e.preventDefault();
+                //   onContextAction(project, { x: e.pageX, y: e.pageY });
+                // }}
               >
                 <td className="py-2 px-2">
                   <button
