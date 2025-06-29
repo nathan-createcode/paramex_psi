@@ -35,7 +35,6 @@ export default function ProjectTable({
         <table className="w-full">
           <thead className="bg-white rounded-3xl p-6 shadow-sm mb-6">
             <tr>
-              <SortableHeader className="text-left py-2 px-2 text-sm font-semibold text-gray-400" width="w-[20px]"></SortableHeader>
               <SortableHeader sortKey="name" width="w-[200px]">Project Name</SortableHeader>
               <SortableHeader sortKey="client" width="w-[130px]">Client</SortableHeader>
               <SortableHeader sortKey="startDate" width="w-[130px]">Start Date</SortableHeader>
@@ -44,6 +43,7 @@ export default function ProjectTable({
               <SortableHeader sortKey="payment" width="w-[120px]">Payment</SortableHeader>
               <SortableHeader sortKey="difficulty" width="w-[120px]">Difficulty</SortableHeader>
               <SortableHeader sortKey="status" width="w-[140px]">Status</SortableHeader>
+              <SortableHeader className="text-left py-2 px-2 text-sm font-semibold text-gray-400" width="w-[20px]"></SortableHeader>
 
             </tr>
           </thead>
@@ -52,24 +52,8 @@ export default function ProjectTable({
               <tr
                 key={project.id}
                 className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
-                // onContextMenu={(e) => {
-                //   e.preventDefault();
-                //   onContextAction(project, { x: e.pageX, y: e.pageY });
-                // }}
               >
-                <td className="py-2 px-2">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation(); // agar tidak trigger onRowClick jika ada
-                      onContextAction(project, { x: e.pageX, y: e.pageY });
-                    }}
-                    className="text-gray-400 hover:text-black rounded-full px-2 py-1 text-lg leading-none cursor-pointer"
-                    title="More actions"
-                  >
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
-                </td>
+
                 <td className="py-4 px-6">
                   <div className="text-sm font-medium text-gray-900">
                     {project.name}
@@ -106,6 +90,19 @@ export default function ProjectTable({
                 </td>
                 <td className="py-4 px-6">
                   <StatusBadge status={project.status} />
+                </td>
+                <td className="py-2 px-2">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation(); // agar tidak trigger onRowClick jika ada
+                      onContextAction(project, { x: e.pageX, y: e.pageY });
+                    }}
+                    className="text-gray-400 hover:text-black rounded-full px-2 py-1 text-lg leading-none cursor-pointer"
+                    title="More actions"
+                  >
+                    <MoreHorizontal className="w-5 h-5" />
+                  </button>
                 </td>
               </tr>
             ))}
