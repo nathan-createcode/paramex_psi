@@ -2,14 +2,18 @@
 
 import { useState, useEffect } from "react"
 import { User, Lock, Bell, Palette, Save, X } from "lucide-react"
+import { supabase } from "../supabase/supabase" // Sesuaikan path
 
 const AccountSettingsModal = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("profile")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
   const [formData, setFormData] = useState({
-    fullName: "Nathan Achmadi",
-    email: "nathan@example.com",
-    phone: "+62 812-3456-7890",
-    company: "Freelance Developer",
+    fullName: "",
+    email: "",
+    phone: "",
+    company: "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -18,8 +22,10 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
     theme: "light",
   })
 
+  // Load user data saat modal dibuka
   useEffect(() => {
     if (isOpen) {
+      loadUserData()
       document.body.style.overflow = "hidden"
       const handleEsc = (e) => {
         if (e.key === "Escape") onClose()
@@ -32,6 +38,61 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen, onClose])
 
+  const loadUserData = async () => {
+    try {
+      setLoading(true)
+      
+      // Get current user dari Supabase Auth
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError) {
+        console.error('Error getting user:', authError)
+        showMessage('Error loading user data', 'error')
+        return
+      }
+
+      if (!user) {
+        console.error('No user found')
+        showMessage('No user session found', 'error')
+        return
+      }
+
+      setCurrentUser(user)
+
+      // Get additional user data dari tabel users (jika ada)
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('name, phone_number')
+        .eq('user_id', user.id)
+        .single()
+
+      // Populate form dengan data user
+      const userMetadata = user.user_metadata || {}
+      
+      setFormData(prev => ({
+        ...prev,
+        fullName: userData?.name || userMetadata.full_name || userMetadata.display_name || '',
+        email: user.email || '',
+        phone: userData?.phone_number || userMetadata.phone || '',
+        company: userMetadata.company || '',
+        // Reset password fields
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+        // Load preferences dari user_metadata jika ada
+        emailNotifications: userMetadata.email_notifications !== undefined ? userMetadata.email_notifications : true,
+        pushNotifications: userMetadata.push_notifications !== undefined ? userMetadata.push_notifications : false,
+        theme: userMetadata.theme || 'light',
+      }))
+
+    } catch (error) {
+      console.error('Error loading user data:', error)
+      showMessage('Failed to load user data', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -39,18 +100,14 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
     }))
   }
 
-  const handleSave = (section) => {
-    // You can replace this with actual API calls
-    console.log(`Saving ${section} settings:`, formData)
-
-    // Show success message
+  const showMessage = (message, type = 'success') => {
     const successMessage = document.createElement("div")
-    successMessage.textContent = `${section} settings saved successfully!`
+    successMessage.textContent = message
     successMessage.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      background: #10B981;
+      background: ${type === 'success' ? '#10B981' : '#EF4444'};
       color: white;
       padding: 12px 24px;
       border-radius: 8px;
@@ -66,6 +123,170 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
         document.body.removeChild(successMessage)
       }
     }, 3000)
+  }
+
+  const handleSaveProfile = async () => {
+    if (!currentUser) return
+
+    try {
+      setSaving(true)
+
+      // Update auth user metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: {
+          full_name: formData.fullName,
+          display_name: formData.fullName,
+          phone: formData.phone,
+          company: formData.company,
+        }
+      })
+
+      if (authError) throw authError
+
+      // Update data di tabel users (jika ada)
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          name: formData.fullName,
+          phone_number: formData.phone,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', currentUser.id)
+
+      // Jika record tidak ada, insert baru
+      if (updateError && updateError.code === 'PGRST116') {
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            user_id: currentUser.id,
+            name: formData.fullName,
+            email: formData.email,
+            phone_number: formData.phone,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }])
+        
+        if (insertError) throw insertError
+      } else if (updateError) {
+        throw updateError
+      }
+
+      showMessage('Profile updated successfully!')
+      
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      showMessage('Failed to update profile', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSavePassword = async () => {
+    if (!currentUser) return
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      showMessage('New passwords do not match', 'error')
+      return
+    }
+
+    if (formData.newPassword.length < 6) {
+      showMessage('Password must be at least 6 characters', 'error')
+      return
+    }
+
+    try {
+      setSaving(true)
+
+      const { error } = await supabase.auth.updateUser({
+        password: formData.newPassword
+      })
+
+      if (error) throw error
+
+      // Clear password fields
+      setFormData(prev => ({
+        ...prev,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      }))
+
+      showMessage('Password updated successfully!')
+      
+    } catch (error) {
+      console.error('Error updating password:', error)
+      showMessage(error.message || 'Failed to update password', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveNotifications = async () => {
+    if (!currentUser) return
+
+    try {
+      setSaving(true)
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          email_notifications: formData.emailNotifications,
+          push_notifications: formData.pushNotifications,
+        }
+      })
+
+      if (error) throw error
+
+      showMessage('Notification preferences saved!')
+      
+    } catch (error) {
+      console.error('Error saving notifications:', error)
+      showMessage('Failed to save notification preferences', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveTheme = async () => {
+    if (!currentUser) return
+
+    try {
+      setSaving(true)
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          theme: formData.theme,
+        }
+      })
+
+      if (error) throw error
+
+      showMessage('Theme preference saved!')
+      
+    } catch (error) {
+      console.error('Error saving theme:', error)
+      showMessage('Failed to save theme preference', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSave = (section) => {
+    switch (section) {
+      case 'Profile':
+        handleSaveProfile()
+        break
+      case 'Password':
+        handleSavePassword()
+        break
+      case 'Notifications':
+        handleSaveNotifications()
+        break
+      case 'Theme':
+        handleSaveTheme()
+        break
+      default:
+        break
+    }
   }
 
   const handleBackdropClick = (e) => {
@@ -84,13 +305,24 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
   ]
 
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
+          <div style={{ fontSize: '16px', color: '#6B7280' }}>Loading user data...</div>
+        </div>
+      )
+    }
+
     switch (activeTab) {
       case "profile":
         return (
           <div style={{ maxWidth: "500px" }}>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 24px 0" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
               Profile Information
             </h2>
+            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
+              Update your account details and personal information
+            </p>
             <div
               style={{
                 display: "grid",
@@ -106,6 +338,7 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                   value={formData.fullName}
                   onChange={(e) => handleInputChange("fullName", e.target.value)}
                   style={styles.input}
+                  placeholder="Enter your full name"
                 />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -113,9 +346,13 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  style={styles.input}
+                  style={{ ...styles.input, backgroundColor: '#F9FAFB', cursor: 'not-allowed' }}
+                  readOnly
+                  title="Email cannot be changed"
                 />
+                <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>
+                  Email address cannot be changed
+                </p>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Phone</label>
@@ -124,6 +361,7 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
                   style={styles.input}
+                  placeholder="Enter your phone number"
                 />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -133,12 +371,17 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                   value={formData.company}
                   onChange={(e) => handleInputChange("company", e.target.value)}
                   style={styles.input}
+                  placeholder="Enter your company name"
                 />
               </div>
             </div>
-            <button style={styles.saveButton} onClick={() => handleSave("Profile")}>
+            <button 
+              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+              onClick={() => handleSave("Profile")}
+              disabled={saving}
+            >
               <Save size={16} />
-              Save Profile
+              {saving ? 'Saving...' : 'Save Profile'}
             </button>
           </div>
         )
@@ -146,25 +389,18 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       case "security":
         return (
           <div style={{ maxWidth: "500px" }}>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 24px 0" }}>Security</h2>
+            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>Security</h2>
+            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
+              Update your password to keep your account secure
+            </p>
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gridTemplateColumns: "1fr",
                 gap: "16px",
                 marginBottom: "24px",
               }}
             >
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Current Password</label>
-                <input
-                  type="password"
-                  value={formData.currentPassword}
-                  onChange={(e) => handleInputChange("currentPassword", e.target.value)}
-                  style={styles.input}
-                  placeholder="Enter current password"
-                />
-              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>New Password</label>
                 <input
@@ -172,7 +408,7 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                   value={formData.newPassword}
                   onChange={(e) => handleInputChange("newPassword", e.target.value)}
                   style={styles.input}
-                  placeholder="Enter new password"
+                  placeholder="Enter new password (min. 6 characters)"
                 />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -186,9 +422,13 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                 />
               </div>
             </div>
-            <button style={styles.saveButton} onClick={() => handleSave("Password")}>
+            <button 
+              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+              onClick={() => handleSave("Password")}
+              disabled={saving || !formData.newPassword || !formData.confirmPassword}
+            >
               <Save size={16} />
-              Update Password
+              {saving ? 'Updating...' : 'Update Password'}
             </button>
           </div>
         )
@@ -196,9 +436,12 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       case "notifications":
         return (
           <div style={{ maxWidth: "500px" }}>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 24px 0" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
               Notifications
             </h2>
+            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
+              Choose how you want to be notified
+            </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "24px" }}>
               <div style={styles.notificationItem}>
                 <div>
@@ -229,9 +472,13 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                 />
               </div>
             </div>
-            <button style={styles.saveButton} onClick={() => handleSave("Notifications")}>
+            <button 
+              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+              onClick={() => handleSave("Notifications")}
+              disabled={saving}
+            >
               <Save size={16} />
-              Save Preferences
+              {saving ? 'Saving...' : 'Save Preferences'}
             </button>
           </div>
         )
@@ -239,7 +486,10 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       case "appearance":
         return (
           <div style={{ maxWidth: "500px" }}>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 24px 0" }}>Appearance</h2>
+            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>Appearance</h2>
+            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
+              Customize the look and feel of your interface
+            </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "24px" }}>
               <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Theme</label>
               <select
@@ -252,9 +502,13 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                 <option value="system">System</option>
               </select>
             </div>
-            <button style={styles.saveButton} onClick={() => handleSave("Theme")}>
+            <button 
+              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+              onClick={() => handleSave("Theme")}
+              disabled={saving}
+            >
               <Save size={16} />
-              Save Theme
+              {saving ? 'Saving...' : 'Save Theme'}
             </button>
           </div>
         )
@@ -279,9 +533,14 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
               <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
                 Account Settings
               </h3>
-              <p style={{ fontSize: "14px", color: "#6B7280", margin: 0 }}>
+              <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 4px 0" }}>
                 Manage your account information and preferences
               </p>
+              {currentUser && (
+                <p style={{ fontSize: "12px", color: "#9CA3AF", margin: 0 }}>
+                  Logged in as: {currentUser.email}
+                </p>
+              )}
             </div>
             <nav style={styles.nav}>
               {tabs.map((tab) => {

@@ -18,6 +18,86 @@ const DSS = () => {
   const [priorityResults, setPriorityResults] = useState([])
   const navigate = useNavigate()
 
+  // Add custom CSS for sliders
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      .deadline-slider::-webkit-slider-thumb,
+      .payment-slider::-webkit-slider-thumb,
+      .difficulty-slider::-webkit-slider-thumb {
+        appearance: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #F9FAFB;
+        border: 2px solid #D1D5DB;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .deadline-slider::-webkit-slider-thumb:hover,
+      .payment-slider::-webkit-slider-thumb:hover,
+      .difficulty-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+      }
+      .deadline-slider::-webkit-slider-thumb:active,
+      .payment-slider::-webkit-slider-thumb:active,
+      .difficulty-slider::-webkit-slider-thumb:active {
+        transform: scale(0.95);
+      }
+
+      /* Firefox slider thumb */
+      .deadline-slider::-moz-range-thumb,
+      .payment-slider::-moz-range-thumb,
+      .difficulty-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .deadline-slider::-moz-range-thumb,
+      .payment-slider::-moz-range-thumb,
+      .difficulty-slider::-moz-range-thumb {
+        background: #F9FAFB;
+        border: 2px solid #D1D5DB;
+      }
+
+      /* Slider track styling */
+      .deadline-slider::-webkit-slider-track,
+      .payment-slider::-webkit-slider-track,
+      .difficulty-slider::-webkit-slider-track {
+        height: 8px;
+        border-radius: 10px;
+        outline: none;
+      }
+
+      .deadline-slider:hover,
+      .payment-slider:hover,
+      .difficulty-slider:hover {
+        opacity: 0.8;
+      }
+
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+      }
+
+      .deadline-slider:focus,
+      .payment-slider:focus,
+      .difficulty-slider:focus {
+        animation: pulse 2s ease-in-out infinite;
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      document.head.removeChild(style)
+    }
+  }, [])
+
   // Authentication check
   useEffect(() => {
     const checkAuth = async () => {
@@ -50,13 +130,31 @@ const DSS = () => {
       setLoading(true)
       const { data, error } = await supabase
         .from("projects")
-        .select("*")
+        .select(`
+          *,
+          type_id:type_id ( type_name ),
+          status_id:status_id ( status_name )
+        `)
         .eq("user_id", userId)
-        .neq("status", "done")
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setProjects(data || [])
+      
+      // Map the data to include status from status_id relation and correct field names
+      const mappedProjects = (data || []).map(project => ({
+        ...project,
+        id: project.project_id,
+        name: project.project_name,
+        client: project.client_name,
+        deadline: project.deadline,
+        payment: project.payment_amount,
+        difficulty: project.difficulty_level,
+        status: project.status_id?.status_name || "unknown",
+        project_type: project.type_id?.type_name || "unknown"
+      })).filter(project => project.status_id?.status_name !== "Done") // Filter out completed projects
+
+      console.log("DSS Projects loaded:", mappedProjects)
+      setProjects(mappedProjects)
     } catch (error) {
       console.error("Error fetching projects:", error)
     } finally {
@@ -133,7 +231,7 @@ const DSS = () => {
 
   return (
     <Layout>
-      <div style={styles.container}>
+      <div className="max-w-7xl mx-auto" style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
           <div>
@@ -159,7 +257,12 @@ const DSS = () => {
                 <div style={styles.weightGroup}>
                   <div style={styles.weightHeader}>
                     <label style={styles.weightLabel}>Deadline Weight</label>
-                    <span style={styles.weightValue}>{weights.deadline}%</span>
+                    <span style={{
+                      ...styles.weightValue,
+                      background: "linear-gradient(135deg, #495057, #343A40)",
+                      backgroundColor: "transparent",
+                      border: "none",
+                    }}>{weights.deadline}%</span>
                   </div>
                   <input
                     type="range"
@@ -168,7 +271,11 @@ const DSS = () => {
                     step="5"
                     value={weights.deadline}
                     onChange={(e) => handleWeightChange("deadline", [Number.parseInt(e.target.value)])}
-                    style={styles.slider}
+                    style={{
+                      ...styles.slider,
+                      ...styles.sliderDeadline,
+                    }}
+                    className="deadline-slider"
                   />
                 </div>
 
@@ -176,7 +283,12 @@ const DSS = () => {
                 <div style={styles.weightGroup}>
                   <div style={styles.weightHeader}>
                     <label style={styles.weightLabel}>Payment Weight</label>
-                    <span style={styles.weightValue}>{weights.payment}%</span>
+                    <span style={{
+                      ...styles.weightValue,
+                      background: "linear-gradient(135deg, #495057, #343A40)",
+                      backgroundColor: "transparent",
+                      border: "none",
+                    }}>{weights.payment}%</span>
                   </div>
                   <input
                     type="range"
@@ -185,7 +297,11 @@ const DSS = () => {
                     step="5"
                     value={weights.payment}
                     onChange={(e) => handleWeightChange("payment", [Number.parseInt(e.target.value)])}
-                    style={styles.slider}
+                    style={{
+                      ...styles.slider,
+                      ...styles.sliderPayment,
+                    }}
+                    className="payment-slider"
                   />
                 </div>
 
@@ -193,7 +309,12 @@ const DSS = () => {
                 <div style={styles.weightGroup}>
                   <div style={styles.weightHeader}>
                     <label style={styles.weightLabel}>Difficulty Weight</label>
-                    <span style={styles.weightValue}>{weights.difficulty}%</span>
+                    <span style={{
+                      ...styles.weightValue,
+                      background: "linear-gradient(135deg, #495057, #343A40)",
+                      backgroundColor: "transparent",
+                      border: "none",
+                    }}>{weights.difficulty}%</span>
                   </div>
                   <input
                     type="range"
@@ -202,7 +323,11 @@ const DSS = () => {
                     step="5"
                     value={weights.difficulty}
                     onChange={(e) => handleWeightChange("difficulty", [Number.parseInt(e.target.value)])}
-                    style={styles.slider}
+                    style={{
+                      ...styles.slider,
+                      ...styles.sliderDifficulty,
+                    }}
+                    className="difficulty-slider"
                   />
                 </div>
               </div>
@@ -216,13 +341,18 @@ const DSS = () => {
                   style={styles.select}
                 >
                   <option value="all">All Active Projects</option>
-                  <option value="on-plan">On-Plan Projects</option>
-                  <option value="on-process">On-Process Projects</option>
-                  <option value="on-discuss">On-Discuss Projects</option>
+                  <option value="On-Plan">On-Plan Projects</option>
+                  <option value="On-Process">On-Process Projects</option>
                 </select>
               </div>
 
               {/* Calculate Button */}
+              {/* Debug info */}
+              <div style={{ marginBottom: "16px", fontSize: "14px", color: "#6B7280" }}>
+                Projects loaded: {projects.length} 
+                {projects.length === 0 && " (Button disabled - no projects found)"}
+              </div>
+
               <button
                 onClick={calculatePriority}
                 disabled={calculating || projects.length === 0}
@@ -266,93 +396,105 @@ const DSS = () => {
                 </div>
               ) : (
                 <div style={styles.resultsList}>
-                  {priorityResults.map((result, index) => (
-                    <div key={result.id} style={styles.resultItem}>
-                      <div style={styles.resultRank}>#{index + 1}</div>
-                      <div style={styles.resultContent}>
-                        <div style={styles.resultHeader}>
-                          <h3 style={styles.resultTitle}>{result.name}</h3>
-                          <div style={styles.resultScore}>
-                            <span style={styles.scoreValue}>{result.score}</span>
-                            <span style={styles.scoreLabel}>Priority Score</span>
-                          </div>
-                        </div>
-                        <p style={styles.resultClient}>Client: {result.client}</p>
-                        <div style={styles.resultFactors}>
-                          <span
-                            style={{
-                              ...styles.factorBadge,
-                              backgroundColor:
-                                result.factors.deadline === "High"
-                                  ? "#FEF2F2"
-                                  : result.factors.deadline === "Medium"
-                                    ? "#FFFBEB"
-                                    : "#EFF6FF",
-                              color:
-                                result.factors.deadline === "High"
-                                  ? "#DC2626"
-                                  : result.factors.deadline === "Medium"
-                                    ? "#D97706"
-                                    : "#2563EB",
-                            }}
-                          >
-                            Deadline: {result.factors.deadline}
-                          </span>
-                          <span
-                            style={{
-                              ...styles.factorBadge,
-                              backgroundColor:
-                                result.factors.payment === "High"
-                                  ? "#ECFDF5"
-                                  : result.factors.payment === "Medium"
-                                    ? "#FFFBEB"
-                                    : "#EFF6FF",
-                              color:
-                                result.factors.payment === "High"
-                                  ? "#059669"
-                                  : result.factors.payment === "Medium"
-                                    ? "#D97706"
-                                    : "#2563EB",
-                            }}
-                          >
-                            Payment: {result.factors.payment}
-                          </span>
-                          <span
-                            style={{
-                              ...styles.factorBadge,
-                              backgroundColor:
-                                result.factors.difficulty === "high"
-                                  ? "#FEF2F2"
-                                  : result.factors.difficulty === "medium"
-                                    ? "#FFFBEB"
-                                    : "#ECFDF5",
-                              color:
-                                result.factors.difficulty === "high"
-                                  ? "#DC2626"
-                                  : result.factors.difficulty === "medium"
-                                    ? "#D97706"
-                                    : "#059669",
-                            }}
-                          >
-                            Difficulty:{" "}
-                            {result.factors.difficulty.charAt(0).toUpperCase() + result.factors.difficulty.slice(1)}
-                          </span>
-                        </div>
-                        <div style={styles.progressContainer}>
-                          <div style={styles.progressBar}>
-                            <div
-                              style={{
-                                ...styles.progressFill,
-                                width: `${result.score}%`,
-                                backgroundColor:
-                                  result.score > 75 ? "#DC2626" : result.score > 60 ? "#D97706" : "#3B82F6",
-                              }}
-                            ></div>
-                          </div>
+                  {priorityResults.map((result, index) => {
+                    // Calculate progress percentage based on highest score
+                    const maxScore = Math.max(...priorityResults.map(r => r.score))
+                    const progressPercentage = maxScore > 0 ? (result.score / maxScore) * 100 : 0
+                    
+                    return (
+                      <div key={result.id} style={styles.resultItem}>
+                          <div style={styles.resultRank}>#{index + 1}</div>
+                            <div style={styles.resultContent}>
+                              <div style={styles.resultItem2}>
+                                <div style={styles.resultContent}>
+                                  <div style={styles.resultHeader}>
+                                    <h3 style={styles.resultTitle}>{result.name}</h3>
+                                  </div>
+                                  <p style={styles.resultClient}>Client: {result.client}</p>
+                                  <div>
+                                    <div style={styles.resultFactors}>
+                                      <span
+                                        style={{
+                                          ...styles.factorBadge,
+                                          backgroundColor:
+                                            result.factors.deadline === "High"
+                                              ? "#FEF2F2"
+                                              : result.factors.deadline === "Medium"
+                                                ? "#FFFBEB"
+                                                : "#EFF6FF",
+                                          color:
+                                            result.factors.deadline === "High"
+                                              ? "#DC2626"
+                                              : result.factors.deadline === "Medium"
+                                                ? "#D97706"
+                                                : "#2563EB",
+                                        }}
+                                      >
+                                        Deadline: {result.factors.deadline}
+                                      </span>
+                                      <span
+                                        style={{
+                                          ...styles.factorBadge,
+                                          backgroundColor:
+                                            result.factors.payment === "High"
+                                              ? "#ECFDF5"
+                                              : result.factors.payment === "Medium"
+                                                ? "#FFFBEB"
+                                                : "#EFF6FF",
+                                          color:
+                                            result.factors.payment === "High"
+                                              ? "#059669"
+                                              : result.factors.payment === "Medium"
+                                                ? "#D97706"
+                                                : "#2563EB",
+                                        }}
+                                      >
+                                        Payment: {result.factors.payment}
+                                      </span>
+                                      <span
+                                        style={{
+                                          ...styles.factorBadge,
+                                          backgroundColor:
+                                            result.factors.difficulty === "high"
+                                              ? "#FEF2F2"
+                                              : result.factors.difficulty === "medium"
+                                                ? "#FFFBEB"
+                                                : "#ECFDF5",
+                                          color:
+                                            result.factors.difficulty === "high"
+                                              ? "#DC2626"
+                                              : result.factors.difficulty === "medium"
+                                                ? "#D97706"
+                                                : "#059669",
+                                        }}
+                                      >
+                                        Difficulty:{" "}
+                                        {result.factors.difficulty.charAt(0).toUpperCase() + result.factors.difficulty.slice(1)}
+                                      </span>
+                                    </div>
+                                </div>
+                              </div>
+                            <div style={styles.resultScore}>
+                              <span style={styles.scoreValue}>{result.score}</span>
+                              <span style={styles.scoreLabel}>Priority Score</span>
+                            </div>  
+                            </div>
+                                                     <div style={styles.progressContainer}>
+                             <div style={styles.progressBar}>
+                               <div
+                                 style={{
+                                   ...styles.progressFill,
+                                   width: `${progressPercentage}%`,
+                                   backgroundColor:
+                                     index === 0 ? "#DC2626" : index === 1 ? "#D97706" : index === 2 ? "#F59E0B" : "#3B82F6",
+                                 }}
+                               ></div>
+                             </div>
+                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -488,16 +630,51 @@ const styles = {
   },
   weightValue: {
     fontSize: "14px",
-    fontWeight: "600",
-    color: "#3B82F6",
+    fontWeight: "700",
+    background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+    padding: "0",
+    borderRadius: "0",
+    backgroundColor: "transparent",
+    border: "none",
+    minWidth: "auto",
+    textAlign: "right",
+    display: "inline-block",
   },
   slider: {
     width: "100%",
-    height: "6px",
-    borderRadius: "3px",
+    height: "8px",
+    borderRadius: "10px",
     background: "#E5E7EB",
     outline: "none",
     cursor: "pointer",
+    appearance: "none",
+    WebkitAppearance: "none",
+    transition: "all 0.3s ease",
+    position: "relative",
+  },
+  sliderDeadline: {
+    background: "#E5E7EB",
+  },
+  sliderPayment: {
+    background: "#E5E7EB",
+  },
+  sliderDifficulty: {
+    background: "#E5E7EB",
+  },
+  sliderThumb: {
+    width: "24px",
+    height: "24px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #ffffff, #f8fafc)",
+    border: "3px solid #3B82F6",
+    cursor: "pointer",
+    boxShadow: "0 4px 8px rgba(59, 130, 246, 0.3), 0 0 0 4px rgba(59, 130, 246, 0.1)",
+    appearance: "none",
+    WebkitAppearance: "none",
+    transition: "all 0.3s ease",
   },
   projectSelection: {
     marginBottom: "32px",
@@ -583,6 +760,9 @@ const styles = {
     borderRadius: "16px",
     backgroundColor: "#FAFAFA",
     boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
+  },
+  resultItem2: {
+    display: "flex",
   },
   resultRank: {
     display: "flex",

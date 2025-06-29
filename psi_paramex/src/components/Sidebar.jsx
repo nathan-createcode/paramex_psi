@@ -14,13 +14,27 @@ import {
   LogOut,
 } from "lucide-react"
 
-const Sidebar = ({ open, setOpen }) => {
+const Sidebar = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
   const [user, setUser] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  
+  // Manage sidebar state internally with localStorage persistence
+  const [open, setOpen] = useState(() => {
+    const savedState = localStorage.getItem('sidebarOpen')
+    return savedState !== null ? JSON.parse(savedState) : true // default to true if no saved state
+  })
+  
   const prevOpen = useRef(open)
+
+  // Save sidebar state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', JSON.stringify(open))
+    // Dispatch custom event to notify Layout component
+    window.dispatchEvent(new Event('sidebarToggle'))
+  }, [open])
 
   const navItems = [
     {
@@ -29,17 +43,17 @@ const Sidebar = ({ open, setOpen }) => {
       icon: LayoutDashboard,
     },
     {
-      name: "Project",
+      name: "Projects",
       href: "/projects",
       icon: ClipboardCheck,
     },
     {
-      name: "DSS & AI",
+      name: "DSS",
       href: "/dss",
       icon: BrainCircuit,
     },
     {
-      name: "Project Advisor",
+      name: "AI Project Advisor",
       href: "/project-advisor",
       icon: BotMessageSquare,
     },
@@ -128,9 +142,9 @@ const Sidebar = ({ open, setOpen }) => {
 
   return (
     <aside
-      className={`fixed top-0 left-0 h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out z-50 ${
-        open ? "w-[280px]" : "w-20"
-      } ${isTransitioning ? "overflow-hidden" : "overflow-visible"}`}
+      className={`fixed top-0 left-0 h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out z-[60] overflow-visible ${
+        open ? "w-[300px]" : "w-20"
+      }`}
       style={{
         boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
       }}
@@ -155,12 +169,21 @@ const Sidebar = ({ open, setOpen }) => {
                 className="w-full h-full object-contain brightness-0 invert"
               />
             </div>
-            {open && <h1 className="text-xl font-bold text-gray-800 m-0">Flowtica</h1>}
+            <div 
+              className="overflow-hidden transition-all duration-300 ease-in-out"
+              style={{
+                width: open ? '120px' : '0px'
+              }}
+            >
+              <h1 className="text-xl font-bold text-gray-800 m-0 relative z-[50] whitespace-nowrap">
+                Flowtica
+              </h1>
+            </div>
           </div>
           <button
             onClick={() => setOpen(!open)}
-            className={`absolute top-[50px] z-[100] rounded-full p-0 border-none bg-white transition-all duration-300 ${
-              open ? "left-[264px]" : "left-[60px]"
+            className={`absolute top-[50px] z-[9999] rounded-full p-0 border-none bg-white transition-all duration-300 ${
+              open ? "left-[280px]" : "left-[60px]"
             }`}
             style={{
               boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -187,11 +210,16 @@ const Sidebar = ({ open, setOpen }) => {
       {/* Main Navigation */}
       <nav className="flex-1 p-4 flex flex-col gap-6 overflow-y-auto">
         <div className="flex flex-col gap-1">
-          {open && (
-            <div className="p-3">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0">MAIN MENU</h2>
+          <div className="p-3">
+            <div 
+              className="overflow-hidden transition-all duration-300 ease-in-out"
+              style={{
+                width: open ? '100%' : '0px'
+              }}
+            >
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0 whitespace-nowrap">MAIN MENU</h2>
             </div>
-          )}
+          </div>
           {navItems.map((item) => {
             const IconComponent = item.icon
             const active = isActive(item.href)
@@ -211,8 +239,17 @@ const Sidebar = ({ open, setOpen }) => {
                 }}
                 title={!open ? item.name : undefined}
               >
-                <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
-                {open && <span className="flex-1">{item.name}</span>}
+                <div className="flex-shrink-0">
+                  <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
+                </div>
+                <div 
+                  className="overflow-hidden transition-all duration-300 ease-in-out flex-1"
+                  style={{
+                    width: open ? '100%' : '0px'
+                  }}
+                >
+                  <span className="whitespace-nowrap">{item.name}</span>
+                </div>
               </button>
             )
           })}
@@ -220,11 +257,16 @@ const Sidebar = ({ open, setOpen }) => {
 
         {/* Secondary Navigation */}
         <div className="flex flex-col gap-1">
-          {open && (
-            <div className="p-3">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0">OTHER</h2>
+          <div className="p-3">
+            <div 
+              className="overflow-hidden transition-all duration-300 ease-in-out"
+              style={{
+                width: open ? '100%' : '0px'
+              }}
+            >
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0 whitespace-nowrap">OTHER</h2>
             </div>
-          )}
+          </div>
           {secondaryItems.map((item) => {
             const IconComponent = item.icon
             const active = isActive(item.href)
@@ -244,21 +286,33 @@ const Sidebar = ({ open, setOpen }) => {
                 }}
                 title={!open ? item.name : item.description}
               >
-                <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
-                {open && (
-                  <div className="flex-1 flex flex-col gap-0.5">
-                    <span>{item.name}</span>
-                    <span className="text-xs text-gray-400">{item.description}</span>
+                <div className="flex-shrink-0">
+                  <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
+                </div>
+                <div 
+                  className="overflow-hidden transition-all duration-300 ease-in-out flex-1"
+                  style={{
+                    width: open ? '100%' : '0px'
+                  }}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="whitespace-nowrap">{item.name}</span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">{item.description}</span>
                   </div>
-                )}
+                </div>
               </button>
             )
           })}
         </div>
 
         {/* User Info Card */}
-        {open && (
-          <div className="pt-6">
+        <div className="pt-6">
+          <div 
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{
+              width: open ? '100%' : '0px'
+            }}
+          >
             <div
               className="rounded-xl p-4 border border-gray-200"
               style={{
@@ -286,7 +340,7 @@ const Sidebar = ({ open, setOpen }) => {
               </div>
             </div>
           </div>
-        )}
+        </div>
       </nav>
 
       {/* Logout Button */}
@@ -299,8 +353,17 @@ const Sidebar = ({ open, setOpen }) => {
           }}
           title={!open ? "Logout" : undefined}
         >
-          <LogOut size={20} color="#EF4444" />
-          {open && <span className="text-red-700">Logout</span>}
+          <div className="flex-shrink-0">
+            <LogOut size={20} color="#EF4444" />
+          </div>
+          <div 
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{
+              width: open ? '100%' : '0px'
+            }}
+          >
+            <span className="text-red-700 whitespace-nowrap">Logout</span>
+          </div>
         </button>
       </div>
     </aside>

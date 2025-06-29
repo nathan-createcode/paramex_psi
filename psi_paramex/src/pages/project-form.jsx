@@ -7,6 +7,7 @@ import {
   Briefcase,
   Clock,
   BarChart3,
+  Circle,
 } from "lucide-react";
 import { supabase } from "../supabase/supabase";
 
@@ -16,13 +17,17 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     client: "",
     startDate: "",
     deadline: "",
-    payment: 0,
+    payment: "",
     difficulty: "",
     type: "",
+    status: "",
   });
   const [typeOptions, setTypeOptions] = useState([]);
   const [typeLoading, setTypeLoading] = useState(true);
   const [typeError, setTypeError] = useState(null);
+  const [statusOptions, setStatusOptions] = useState([]);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [statusError, setStatusError] = useState(null);
 
   useEffect(() => {
     if (initialData) {
@@ -31,9 +36,10 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
         client: initialData.client || "",
         startDate: initialData.startDate || "",
         deadline: initialData.deadline || "",
-        payment: initialData.payment ?? 0,
+        payment: initialData.payment || "",
         difficulty: initialData.difficulty || "",
         type: initialData.type || "",
+        status: initialData.status || "",
       });
     }
   }, [initialData]);
@@ -56,24 +62,110 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     fetchTypes();
   }, []);
 
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      setStatusLoading(true);
+      setStatusError(null);
+      try {
+        const { data, error } = await supabase.from("project_status").select("*");
+        if (error) throw error;
+        // Filter out "On-Discuss" status
+        const filteredStatuses = (data || []).filter(status => 
+          status.status_name?.toLowerCase() !== 'on-discuss'
+        );
+        setStatusOptions(filteredStatuses);
+      } catch {
+        setStatusError("Failed to load project statuses");
+      } finally {
+        setStatusLoading(false);
+      }
+    };
+    fetchStatuses();
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     await onSubmit(formData);
+  };
+
+  const formatCurrency = (value) => {
+    if (!value) return "";
+    // Remove any non-numeric characters except digits
+    let numericValue = value.toString().replace(/[^\d]/g, "");
+    
+    // Limit to maximum 15 digits to prevent precision issues
+    if (numericValue.length > 15) {
+      numericValue = numericValue.slice(0, 15);
+    }
+    
+    // Format with dot as thousand separator
+    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const parseCurrency = (value) => {
+    if (!value) return "";
+    // Remove dots (thousand separators) and keep only digits
+    let numericValue = value.toString().replace(/\./g, "").replace(/[^\d]/g, "");
+    
+    // Limit to maximum 15 digits
+    if (numericValue.length > 15) {
+      numericValue = numericValue.slice(0, 15);
+    }
+    
+    return numericValue === "" ? "" : numericValue;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "payment" ? parseFloat(value) || 0 : value,
+      [name]: name === "payment" ? parseCurrency(value) : value,
     }));
   };
 
+  const getStatusDotColor = (statusName) => {
+    switch (statusName?.toLowerCase()) {
+      case 'on-process':
+        return 'text-yellow-500';
+      case 'on-plan':
+        return 'text-blue-500';
+      case 'done':
+        return 'text-green-500';
+      default:
+        return 'text-gray-400';
+    }
+  };
+
+  const getDifficultyDotColor = (difficulty) => {
+    switch (difficulty?.toLowerCase()) {
+      case 'low':
+        return 'text-green-500';
+      case 'medium':
+        return 'text-yellow-500';
+      case 'high':
+        return 'text-red-500';
+      default:
+        return 'text-gray-400';
+    }
+  };
+
+  const getTypeDotColor = (typeId) => {
+    const colors = [
+      'text-purple-500',
+      'text-indigo-500', 
+      'text-pink-500',
+      'text-teal-500',
+      'text-orange-500',
+      'text-cyan-500'
+    ];
+    return colors[typeId % colors.length] || 'text-gray-400';
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
+      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Fixed */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               {editMode ? "Edit Project" : "Add New Project"}
@@ -92,9 +184,9 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
           </button>
         </div>
 
-        <div className="flex">
-          {/* Form Section */}
-          <div className="flex-1 p-6">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -174,9 +266,9 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
-                      type="number"
+                      type="text"
                       name="payment"
-                      value={formData.payment}
+                      value={formatCurrency(formData.payment)}
                       onChange={handleChange}
                       placeholder="Enter Payment Amount"
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -198,52 +290,89 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                       required
                     >
-                      <option>Select difficulty</option>
+                      <option value="">Select difficulty</option>
                       <option value="Low">Low</option>
                       <option value="Medium">Medium</option>
                       <option value="High">High</option>
                     </select>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Type
-                </label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <select
-                    name="type"
-                    value={formData.type}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
-                    required
-                    disabled={typeLoading || !!typeError}
-                  >
-                    <option value="">
-                      {typeLoading ? "Loading types..." : "Select Project type"}
-                    </option>
-                    {typeError && (
-                      <option value="" disabled>
-                        {typeError}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Project Type
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <select
+                      name="type"
+                      value={formData.type}
+                      onChange={handleChange}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+                      required
+                      disabled={typeLoading || !!typeError}
+                    >
+                      <option value="">
+                        {typeLoading ? "Loading types..." : "Select Project type"}
                       </option>
-                    )}
-                    {typeOptions.map((type) => (
-                      <option key={type.type_id} value={type.type_id}>
-                        {type.type_name}
+                      {typeError && (
+                        <option value="" disabled>
+                          {typeError}
+                        </option>
+                      )}
+                      {typeOptions.map((type) => (
+                        <option 
+                          key={type.type_id} 
+                          value={type.type_id}
+                        >
+                          {type.type_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <div className="relative">
+                    <Circle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+                      required
+                      disabled={statusLoading || !!statusError}
+                    >
+                      <option value="">
+                        {statusLoading ? "Loading statuses..." : "Select Project status"}
                       </option>
-                    ))}
-                  </select>
+                      {statusError && (
+                        <option value="" disabled>
+                          {statusError}
+                        </option>
+                      )}
+                      {statusOptions.map((status) => (
+                        <option 
+                          key={status.status_id} 
+                          value={status.status_id}
+                        >
+                          {status.status_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Form Actions */}
-              <div className="flex gap-3 pt-6">
+              {/* Form Actions - Fixed at bottom */}
+              <div className="flex gap-3 pt-6 border-t border-gray-200 bg-white sticky bottom-0">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-medium transition-colors"
                 >
                   Cancel
                 </button>

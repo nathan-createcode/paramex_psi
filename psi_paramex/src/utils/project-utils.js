@@ -11,7 +11,7 @@
  * @property {string} type
  * @property {string} payment
  * @property {'Low' | 'Medium' | 'High'} difficulty
- * @property {'On-Process' | 'On-Plan' | 'Completed'} status
+ * @property {'On-Process' | 'On-Plan' | 'Done'} status
  */
 
 /**
@@ -88,7 +88,7 @@ const checkDeadlineFilter = (project, deadlineFilter) => {
       return deadline >= nextMonth && deadline <= monthAfterNext;
 
     case 'Overdue':
-      return deadline < today && project.status !== 'Completed';
+      return deadline < today && project.status !== 'Done';
 
     default:
       return true;
@@ -107,4 +107,71 @@ export const formatDate = (dateString) => {
     day: 'numeric',
     year: 'numeric',
   });
+};
+
+/**
+ * Format currency amount with dollar sign and comma separators
+ * @param {number|string} amount
+ * @returns {string}
+ */
+export const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined || amount === '') {
+    return '$0';
+  }
+  
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  if (isNaN(numAmount)) {
+    return '$0';
+  }
+  
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(numAmount);
+};
+
+/**
+ * Get deadline status and corresponding styles
+ * @param {string} deadlineString
+ * @param {string} projectStatus
+ * @returns {Object} Object with status and styling class
+ */
+export const getDeadlineStatus = (deadlineString, projectStatus) => {
+  const today = new Date();
+  const deadline = new Date(deadlineString);
+  const timeDiff = deadline.getTime() - today.getTime();
+  const hoursDiff = timeDiff / (1000 * 60 * 60);
+  
+  // If project is done, use normal styling
+  if (projectStatus && projectStatus.toLowerCase() === 'done') {
+    return {
+      status: 'completed',
+      className: 'text-gray-600'
+    };
+  }
+  
+  // Check if deadline has passed
+  if (timeDiff < 0) {
+    return {
+      status: 'overdue',
+      className: 'text-red-600 font-medium'
+    };
+  }
+  
+  // Check if deadline is within 24 hours
+  if (hoursDiff <= 24) {
+    return {
+      status: 'urgent',
+      className: 'text-yellow-600 font-medium'
+    };
+  }
+  
+  // Normal deadline
+  return {
+    status: 'normal',
+    className: 'text-gray-600'
+  };
 };
