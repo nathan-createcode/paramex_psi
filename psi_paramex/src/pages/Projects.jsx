@@ -41,7 +41,7 @@ export default function ProjectManagementPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({
     key: null,
-    direction: 'asc'
+    direction: "asc",
   });
 
   // Check authentication and fetch projects
@@ -79,6 +79,17 @@ export default function ProjectManagementPage() {
     window.addEventListener("click", closeMenu);
     return () => window.removeEventListener("click", closeMenu);
   }, [contextMenu.visible]);
+
+  // Auto-Hide pop-up form
+  useEffect(() => {
+    if (formSuccess || formError) {
+      const timer = setTimeout(() => {
+        setFormSuccess(null);
+        setFormError(null);
+      }, 4000); // Hilang setelah 4 detik
+      return () => clearTimeout(timer);
+    }
+  }, [formSuccess, formError]);
 
   const fetchProjects = async (userId) => {
     try {
@@ -118,61 +129,63 @@ export default function ProjectManagementPage() {
   };
 
   const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
 
   const filteredProjects = useMemo(() => {
     const filtered = filterProjects(projects, searchQuery, filters);
-    
+
     // Apply sorting if sortConfig is set
     if (sortConfig.key) {
       const sorted = [...filtered].sort((a, b) => {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
-        
+
         // Handle null or undefined values
         if (aValue == null && bValue == null) return 0;
-        if (aValue == null) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (bValue == null) return sortConfig.direction === 'asc' ? 1 : -1;
-        
+        if (aValue == null) return sortConfig.direction === "asc" ? -1 : 1;
+        if (bValue == null) return sortConfig.direction === "asc" ? 1 : -1;
+
         // Handle date sorting (for startDate and deadline)
-        if (sortConfig.key === 'startDate' || sortConfig.key === 'deadline') {
+        if (sortConfig.key === "startDate" || sortConfig.key === "deadline") {
           const dateA = new Date(aValue);
           const dateB = new Date(bValue);
           const comparison = dateA.getTime() - dateB.getTime();
-          return sortConfig.direction === 'asc' ? comparison : -comparison;
+          return sortConfig.direction === "asc" ? comparison : -comparison;
         }
-        
+
         // Handle numeric sorting (for payment)
-        if (sortConfig.key === 'payment') {
+        if (sortConfig.key === "payment") {
           const numA = parseFloat(aValue) || 0;
           const numB = parseFloat(bValue) || 0;
           const comparison = numA - numB;
-          return sortConfig.direction === 'asc' ? comparison : -comparison;
+          return sortConfig.direction === "asc" ? comparison : -comparison;
         }
-        
+
         // Handle string comparison (for name, client, type, difficulty, status)
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          const comparison = aValue.toLowerCase().localeCompare(bValue.toLowerCase());
-          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        if (typeof aValue === "string" && typeof bValue === "string") {
+          const comparison = aValue
+            .toLowerCase()
+            .localeCompare(bValue.toLowerCase());
+          return sortConfig.direction === "asc" ? comparison : -comparison;
         }
-        
+
         // Fallback comparison
         if (aValue < bValue) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
+          return sortConfig.direction === "asc" ? -1 : 1;
         }
         if (aValue > bValue) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
+          return sortConfig.direction === "asc" ? 1 : -1;
         }
         return 0;
       });
       return sorted;
     }
-    
+
     return filtered;
   }, [projects, searchQuery, filters, sortConfig]);
 
@@ -236,16 +249,19 @@ export default function ProjectManagementPage() {
           }}
         />
 
-        {formSuccess && (
-          <div className="mb-4 p-3 rounded-lg bg-green-100 text-green-800 border border-green-200">
-            {formSuccess}
-          </div>
-        )}
-        {formError && (
-          <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-800 border border-red-200">
-            {formError}
-          </div>
-        )}
+        {/* Toast Notification Container */}
+        <div className="fixed top-6 right-6 z-[9999] space-y-4">
+          {formSuccess && (
+            <div className="px-4 py-3 rounded-lg bg-green-100 text-green-800 border border-green-300 shadow-md transition-opacity duration-300">
+              {formSuccess}
+            </div>
+          )}
+          {formError && (
+            <div className="px-4 py-3 rounded-lg bg-red-100 text-red-800 border border-red-300 shadow-md transition-opacity duration-300">
+              {formError}
+            </div>
+          )}
+        </div>
 
         <ProjectTable
           projects={displayProjects}
@@ -309,11 +325,11 @@ export default function ProjectManagementPage() {
 
               // Use simple insert method - no SQL needed!
               const result = await insertProjectAuto(projectData);
-              
+
               if (!result.success) {
                 throw new Error(result.error || "Failed to insert project");
               }
-              
+
               console.log("Successfully inserted project:", result.data);
               setFormSuccess("Project successfully added!");
               setShowProjectForm(false);
