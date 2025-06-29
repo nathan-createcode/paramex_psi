@@ -43,6 +43,8 @@ const projectTypeMapping = {
   5: "Mobile Development",
 }
 
+
+// ANIN INI WARNA UNTUK TYPE!!
 const projectTypeColors = {
   1: "#3B82F6", // Website - Blue
   2: "#10B981", // Foto - Green
