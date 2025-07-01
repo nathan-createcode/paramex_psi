@@ -19,3 +19,10 @@ DOCUMENTATION:
 - CRUD project
 - RLS project
 - convert beberapa file dari css to tailwind css
+
+01/07/2025 [17:21]
+- perubahan side bar (ada lingkaran)
+- fitur "overdue"
+- filter "overdue"
+- status "done" baru muncul kalo user pilih filter "done"
+- badge untuk difficulty
