@@ -91,6 +91,28 @@ export default function ProjectManagementPage() {
     }
   }, [formSuccess, formError]);
 
+  const updateOverdueProjects = async (projectsToCheck) => {
+    const today = new Date();
+    const overdueProjects = projectsToCheck.filter(
+      (p) =>
+        new Date(p.deadline) < today &&
+        p.status.toLowerCase() !== "done" &&
+        p.status.toLowerCase() !== "overdue"
+    );
+  
+    for (const proj of overdueProjects) {
+      try {
+        await supabase
+          .from("projects")
+          .update({ status_id: "4" }) 
+          .eq("project_id", proj.id);
+      } catch (err) {
+        console.error("Failed to update project to overdue:", proj.name, err);
+      }
+    }
+  };
+  
+
   const fetchProjects = async (userId) => {
     try {
       setLoading(true);
@@ -121,6 +143,8 @@ export default function ProjectManagementPage() {
       }));
 
       setProjects(mapped);
+      await updateOverdueProjects(mapped);
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -139,9 +163,15 @@ export default function ProjectManagementPage() {
   const filteredProjects = useMemo(() => {
     const filtered = filterProjects(projects, searchQuery, filters);
 
+    // Sembunyikan proyek "done" secara default jika filter status bukan "done"
+    const hideDoneUnlessFiltered =
+      filters.status.toLowerCase() !== "done"
+        ? filtered.filter((project) => project.status.toLowerCase() !== "done")
+        : filtered;
+
     // Apply sorting if sortConfig is set
     if (sortConfig.key) {
-      const sorted = [...filtered].sort((a, b) => {
+      const sorted = [...hideDoneUnlessFiltered].sort((a, b) => {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
 
@@ -186,7 +216,7 @@ export default function ProjectManagementPage() {
       return sorted;
     }
 
-    return filtered;
+    return hideDoneUnlessFiltered;
   }, [projects, searchQuery, filters, sortConfig]);
 
   const displayProjects = filteredProjects.map((project) => ({

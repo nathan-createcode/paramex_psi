@@ -51,7 +51,7 @@ export default function ProjectTable({
             {projects.map((project) => (
               <tr
                 key={project.id}
-                className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                className="hover:bg-gray-50 transition-colors duration-150"
               >
 
                 <td className="py-4 px-6">
