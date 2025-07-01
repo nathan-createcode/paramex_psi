@@ -27,7 +27,7 @@ const Sidebar = ({ open, setOpen }) => {
       icon: LayoutDashboard,
     },
     {
-      name: "Projects",
+      name: "Projects Management",
       href: "/projects",
       icon: ClipboardCheck,
     },
