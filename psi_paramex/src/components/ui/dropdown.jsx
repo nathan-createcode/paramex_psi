@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
 export default function Dropdown({
@@ -11,23 +12,91 @@ export default function Dropdown({
   variant = 'default' // 'default' atau 'form'
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState('bottom');
+  const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0, width: 0 });
+  const [isAnimating, setIsAnimating] = useState(false);
   const dropdownRef = useRef(null);
+  const isSelectingRef = useRef(false);
+  const dropdownId = useRef(`dropdown-${Math.random().toString(36).substr(2, 9)}`);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Don't close if we're in the middle of selecting
+      if (isSelectingRef.current) return;
+      
+      // Check if click is inside the dropdown container or the dropdown menu
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
+        // Also check if click is inside the dropdown menu (portal)
+        const dropdownMenu = document.querySelector(`[data-dropdown-id="${dropdownId.current}"]`);
+        if (!dropdownMenu || !dropdownMenu.contains(event.target)) {
+          setIsAnimating(false);
+          setTimeout(() => {
+            setIsOpen(false);
+          }, 200);
+        }
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const handleScrollOrResize = () => {
+      if (isOpen && dropdownRef.current) {
+        const rect = dropdownRef.current.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        const spaceBelow = windowHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        
+        // Estimate dropdown height (40px per option + padding)
+        const estimatedHeight = Math.min(options.length * 40 + 16, 200);
+        
+        // If not enough space below but enough space above, flip to top
+        if (spaceBelow < estimatedHeight && spaceAbove > estimatedHeight) {
+          setDropdownPosition('top');
+          setDropdownCoords({
+            top: rect.top - estimatedHeight - 8,
+            left: rect.left,
+            width: rect.width
+          });
+        } else {
+          setDropdownPosition('bottom');
+          setDropdownCoords({
+            top: rect.bottom + 8,
+            left: rect.left,
+            width: rect.width
+          });
+        }
+      }
+    };
 
-  const handleSelect = (optionValue) => {
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, options.length]);
+
+  // Reset animation state when dropdown closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsAnimating(false);
+    }
+  }, [isOpen]);
+
+  const handleSelect = useCallback((optionValue) => {
+    isSelectingRef.current = true;
     onChange(optionValue);
-    setIsOpen(false);
-  };
+    setIsAnimating(false);
+    setTimeout(() => {
+      setIsOpen(false);
+      isSelectingRef.current = false;
+    }, 200);
+  }, [onChange]);
+
+
 
   const getDisplayValue = () => {
     if (!value) return placeholder;
@@ -67,7 +136,50 @@ export default function Dropdown({
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) {
+            if (!isOpen) {
+              // Calculate position and open
+              if (dropdownRef.current) {
+                const rect = dropdownRef.current.getBoundingClientRect();
+                const windowHeight = window.innerHeight;
+                const spaceBelow = windowHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                
+                // Estimate dropdown height (40px per option + padding)
+                const estimatedHeight = Math.min(options.length * 40 + 16, 200);
+                
+                // If not enough space below but enough space above, flip to top
+                if (spaceBelow < estimatedHeight && spaceAbove > estimatedHeight) {
+                  setDropdownPosition('top');
+                  setDropdownCoords({
+                    top: rect.top - estimatedHeight - 8,
+                    left: rect.left,
+                    width: rect.width
+                  });
+                } else {
+                  setDropdownPosition('bottom');
+                  setDropdownCoords({
+                    top: rect.bottom + 8,
+                    left: rect.left,
+                    width: rect.width
+                  });
+                }
+              }
+              setIsOpen(true);
+              setTimeout(() => {
+                setIsAnimating(true);
+              }, 10);
+            } else {
+              setIsAnimating(false);
+              setTimeout(() => {
+                setIsOpen(false);
+              }, 200);
+            }
+          }
+        }}
         disabled={disabled}
         className={getButtonStyles()}
       >
@@ -79,39 +191,26 @@ export default function Dropdown({
         }`} />
       </button>
 
-      {isOpen && !disabled && (
+      {isOpen && !disabled && createPortal(
         <div 
-          className={`absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 transition-all duration-200 ease-out ${
-            isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2'
+          data-dropdown-id={dropdownId.current}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+          className={`bg-white border border-gray-200 rounded-xl shadow-xl z-[9999] py-2 transition-all duration-200 ease-out ${
+            isAnimating ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2'
           }`}
           style={{
+            position: 'fixed',
+            top: dropdownCoords.top,
+            left: dropdownCoords.left,
+            width: dropdownCoords.width,
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            animation: 'dropIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            maxHeight: '200px',
+            overflowY: 'auto'
           }}
         >
-          <style>{`
-            @keyframes dropIn {
-              0% {
-                opacity: 0;
-                transform: translateY(-8px) scale(0.95);
-              }
-              100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-            
-            @keyframes slideIn {
-              0% {
-                opacity: 0;
-                transform: translateX(-8px);
-              }
-              100% {
-                opacity: 1;
-                transform: translateX(0);
-              }
-            }
-          `}</style>
+
           
           {options.map((option, index) => {
             const optionValue = getOptionValue(option);
@@ -120,16 +219,17 @@ export default function Dropdown({
             
             return (
               <button
+                type="button"
                 key={index}
-                onClick={() => handleSelect(optionValue)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelect(optionValue);
+                }}
                 className={`w-full px-4 py-2 text-left text-sm transition-all duration-200 flex items-center justify-between group ${
                   isSelected 
                     ? 'bg-blue-50 text-blue-900 font-medium border-l-2 border-blue-500' 
                     : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                 }`}
-                style={{
-                  animation: `slideIn 0.3s ease-out ${index * 50}ms both`
-                }}
               >
                 <span className="transition-transform duration-200 group-hover:translate-x-1">
                   {optionLabel}
@@ -142,7 +242,8 @@ export default function Dropdown({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
