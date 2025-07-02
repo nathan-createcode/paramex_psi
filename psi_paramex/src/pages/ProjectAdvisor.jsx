@@ -27,7 +27,7 @@ const ProjectAdvisor = () => {
       {
         id: 1,
         type: "ai",
-        content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I'm connected to advanced AI capabilities to provide you with intelligent, personalized advice. What would you like to discuss today?",
+        content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I have access to your current projects and can provide personalized advice based on your actual workload, deadlines, and project mix. What would you like to discuss today?",
         timestamp: new Date(),
       },
     ]
@@ -37,6 +37,9 @@ const ProjectAdvisor = () => {
   const [isRevealing, setIsRevealing] = useState(false)
   const [revealingMessageId, setRevealingMessageId] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [animatingMessages, setAnimatingMessages] = useState(new Set())
+  const [userId, setUserId] = useState(null)
+  const [userProjects, setUserProjects] = useState([])
   const messagesEndRef = useRef(null)
   const typewriterTimeoutRef = useRef(null)
   const navigate = useNavigate()
@@ -57,6 +60,9 @@ const ProjectAdvisor = () => {
           return
         }
 
+        setUserId(session.user.id)
+        // Fetch user projects for AI context
+        await fetchUserProjects(session.user.id)
         setLoading(false)
       } catch (error) {
         console.error("Auth error:", error)
@@ -95,7 +101,7 @@ const ProjectAdvisor = () => {
     const defaultMessage = {
       id: 1,
       type: "ai",
-      content: "Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization.",
+      content: `Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization.${userProjects.length > 0 ? ` I have access to your ${userProjects.length} current project${userProjects.length !== 1 ? 's' : ''} and can provide personalized advice.` : ''}`,
       timestamp: new Date(),
     }
     setMessages([defaultMessage])
@@ -104,6 +110,20 @@ const ProjectAdvisor = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  // Function to fetch user projects for AI context
+  const fetchUserProjects = async (userId) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/user-projects/${userId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setUserProjects(data.projects || [])
+        console.log('Loaded projects for AI context:', data.projects?.length || 0)
+      }
+    } catch (error) {
+      console.error('Failed to fetch user projects:', error)
+    }
   }
 
   // Typewriter effect function
@@ -149,7 +169,8 @@ const ProjectAdvisor = () => {
         },
         body: JSON.stringify({
           message: userMessage,
-          conversation_history: conversationHistory
+          conversation_history: conversationHistory,
+          user_id: userId  // Send user ID for project context
         })
       })
 
@@ -175,7 +196,19 @@ const ProjectAdvisor = () => {
       timestamp: new Date(),
     }
 
+    // Add animation for new user message
+    setAnimatingMessages(prev => new Set([...prev, userMessage.id]))
     setMessages((prev) => [...prev, userMessage])
+    
+    // Remove animation class after animation completes
+    setTimeout(() => {
+      setAnimatingMessages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(userMessage.id)
+        return newSet
+      })
+    }, 500)
+
     const messageText = inputMessage.trim()
     setInputMessage("")
     setIsTyping(true)
@@ -194,9 +227,21 @@ const ProjectAdvisor = () => {
         isRevealing: true,
       }
 
+      // Add animation for new AI message
+      setAnimatingMessages(prev => new Set([...prev, aiResponseId]))
+      
       // Add empty message first
       setMessages((prev) => [...prev, aiResponse])
       setIsTyping(false)
+
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        setAnimatingMessages(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(aiResponseId)
+          return newSet
+        })
+      }, 500)
 
       // Start typewriter effect
       await typewriterEffect(aiResponseContent, aiResponseId)
@@ -212,8 +257,19 @@ const ProjectAdvisor = () => {
         isRevealing: true,
       }
       
+      // Add animation for error message
+      setAnimatingMessages(prev => new Set([...prev, errorResponseId]))
       setMessages((prev) => [...prev, errorResponse])
       setIsTyping(false)
+      
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        setAnimatingMessages(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(errorResponseId)
+          return newSet
+        })
+      }, 500)
       
       // Type out error message
       await typewriterEffect(
@@ -250,7 +306,19 @@ const ProjectAdvisor = () => {
       timestamp: new Date(),
     }
 
+    // Add animation for new user message
+    setAnimatingMessages(prev => new Set([...prev, userMessage.id]))
     setMessages((prev) => [...prev, userMessage])
+    
+    // Remove animation class after animation completes
+    setTimeout(() => {
+      setAnimatingMessages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(userMessage.id)
+        return newSet
+      })
+    }, 500)
+
     setIsTyping(true)
 
     try {
@@ -267,9 +335,21 @@ const ProjectAdvisor = () => {
         isRevealing: true,
       }
 
+      // Add animation for new AI message
+      setAnimatingMessages(prev => new Set([...prev, aiResponseId]))
+      
       // Add empty message first
       setMessages((prev) => [...prev, aiResponse])
       setIsTyping(false)
+
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        setAnimatingMessages(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(aiResponseId)
+          return newSet
+        })
+      }, 500)
 
       // Start typewriter effect
       await typewriterEffect(aiResponseContent, aiResponseId)
@@ -285,8 +365,19 @@ const ProjectAdvisor = () => {
         isRevealing: true,
       }
       
+      // Add animation for error message
+      setAnimatingMessages(prev => new Set([...prev, errorResponseId]))
       setMessages((prev) => [...prev, errorResponse])
       setIsTyping(false)
+      
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        setAnimatingMessages(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(errorResponseId)
+          return newSet
+        })
+      }, 500)
       
       // Type out error message
       await typewriterEffect(
@@ -318,7 +409,14 @@ const ProjectAdvisor = () => {
                 <AIIcon />
                 AI Project Advisor
               </h1>
-              <p style={styles.subtitle}>Get intelligent advice for your freelance project management challenges</p>
+              <p style={styles.subtitle}>
+                Get intelligent advice for your freelance project management challenges
+                {userProjects.length > 0 && (
+                  <span style={styles.projectContext}>
+                    • AI has access to {userProjects.length} project{userProjects.length !== 1 ? 's' : ''} for personalized advice
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         </div>
@@ -334,6 +432,7 @@ const ProjectAdvisor = () => {
                   ...styles.messageWrapper,
                   justifyContent: message.type === "user" ? "flex-end" : "flex-start",
                 }}
+                className={animatingMessages.has(message.id) ? "message-slide-up" : ""}
               >
                 <div style={styles.messageGroup}>
                   {message.type === "ai" && (
@@ -363,20 +462,13 @@ const ProjectAdvisor = () => {
               </div>
             ))}
 
-            {/* Typing Indicator - only show when waiting for AI response, not during reveal */}
+            {/* Simple Loading Indicator - only show when waiting for AI response, not during reveal */}
             {isTyping && !isRevealing && (
-              <div style={styles.messageWrapper}>
-                <div style={styles.messageGroup}>
-                  <div style={styles.aiAvatar}>
-                    <AIIcon />
-                  </div>
-                  <div style={{ ...styles.messageBubble, ...styles.aiMessage }}>
-                    <div style={styles.typingIndicator}>
-                      <div style={styles.typingDot} className="typing-dot"></div>
-                      <div style={styles.typingDot} className="typing-dot"></div>
-                      <div style={styles.typingDot} className="typing-dot"></div>
-                    </div>
-                  </div>
+              <div style={styles.simpleLoadingContainer}>
+                <div style={styles.typingIndicator}>
+                  <div style={styles.typingDot} className="typing-dot"></div>
+                  <div style={styles.typingDot} className="typing-dot"></div>
+                  <div style={styles.typingDot} className="typing-dot"></div>
                 </div>
               </div>
             )}
@@ -550,6 +642,13 @@ const styles = {
     color: "#6b7280",
     margin: 0,
   },
+  projectContext: {
+    display: "block",
+    fontSize: "14px",
+    color: "#10B981",
+    fontWeight: "500",
+    marginTop: "4px",
+  },
   chatContainer: {
     backgroundColor: "transparent",
     display: "flex",
@@ -637,6 +736,12 @@ const styles = {
     height: "8px",
     backgroundColor: "#6B7280",
     borderRadius: "50%",
+  },
+  simpleLoadingContainer: {
+    display: "flex",
+    justifyContent: "flex-start",
+    marginLeft: "24px",
+    padding: "16px 24px",
   },
   quickQuestionsContainer: {
     padding: "24px",
@@ -768,12 +873,29 @@ styleSheet.innerText = `
     animation-delay: 0.4s;
   }
 
+
+
   .clearButton:hover {
     background-color: #2563EB;
   }
 
   .quickQuestionButton:hover {
     background-color: #F3F4F6;
+  }
+
+  @keyframes slideUpFromBottom {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .message-slide-up {
+    animation: slideUpFromBottom 0.4s ease-out;
   }
 `
 document.head.appendChild(styleSheet)
