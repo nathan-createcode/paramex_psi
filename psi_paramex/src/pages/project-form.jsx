@@ -171,7 +171,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
   return (
     <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative">
         {/* Header - Fixed */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>
@@ -194,168 +194,166 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          <form onSubmit={handleSubmit}>
-            <div className="p-6 pb-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Project Name
-                  </label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Enter project name"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Client
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      name="client"
-                      value={formData.client}
-                      onChange={handleChange}
-                      placeholder="Enter client name"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Start Date
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="date"
-                      name="startDate"
-                      value={formData.startDate}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Deadline
-                  </label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="date"
-                      name="deadline"
-                      value={formData.deadline}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Payment
-                  </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      name="payment"
-                      value={formatCurrency(formData.payment)}
-                      onChange={handleChange}
-                      placeholder="Enter Payment Amount"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Difficulty
-                  </label>
-                  <div className="relative">
-                    <BarChart3 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                    <Dropdown
-                      value={formData.difficulty}
-                      onChange={(value) => handleChange({ target: { name: "difficulty", value } })}
-                      options={[
-                        { value: "Low", label: "Low" },
-                        { value: "Medium", label: "Medium" },
-                        { value: "High", label: "High" }
-                      ]}
-                      placeholder="Select difficulty"
-                      variant="form"
-                      className="w-full pl-10"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Project Type
-                  </label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                    <Dropdown
-                      value={formData.type}
-                      onChange={(value) => handleChange({ target: { name: "type", value } })}
-                      options={typeOptions.map(type => ({
-                        value: type.type_id,
-                        label: type.type_name
-                      }))}
-                      placeholder={typeLoading ? "Loading types..." : "Select Project type"}
-                      variant="form"
-                      disabled={typeLoading || !!typeError}
-                      className="w-full pl-10"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <div className="relative">
-                    <Circle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                    <Dropdown
-                      value={formData.status}
-                      onChange={(value) => handleChange({ target: { name: "status", value } })}
-                      options={statusOptions.map(status => ({
-                        value: status.status_id,
-                        label: status.status_name
-                      }))}
-                      placeholder={statusLoading ? "Loading statuses..." : "Select Project status"}
-                      variant="form"
-                      disabled={statusLoading || !!statusError}
-                      className="w-full pl-10"
-                    />
-                  </div>
+          <div className="p-6 pb-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project Name
+                </label>
+                <div className="relative">
+                  <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Enter project name"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                  />
                 </div>
               </div>
-              {/* Add some bottom padding to ensure content doesn't hide behind sticky buttons */}
-              <div className="h-6"></div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Client
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    name="client"
+                    value={formData.client}
+                    onChange={handleChange}
+                    placeholder="Enter client name"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Start Date
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="date"
+                    name="startDate"
+                    value={formData.startDate}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Deadline
+                </label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="date"
+                    name="deadline"
+                    value={formData.deadline}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Payment
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    name="payment"
+                    value={formatCurrency(formData.payment)}
+                    onChange={handleChange}
+                    placeholder="Enter Payment Amount"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Difficulty
+                </label>
+                <div className="relative">
+                  <BarChart3 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                  <Dropdown
+                    value={formData.difficulty}
+                    onChange={(value) => handleChange({ target: { name: "difficulty", value } })}
+                    options={[
+                      { value: "Low", label: "Low" },
+                      { value: "Medium", label: "Medium" },
+                      { value: "High", label: "High" }
+                    ]}
+                    placeholder="Select difficulty"
+                    variant="form"
+                    className="w-full pl-10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project Type
+                </label>
+                <div className="relative">
+                  <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                  <Dropdown
+                    value={formData.type}
+                    onChange={(value) => handleChange({ target: { name: "type", value } })}
+                    options={typeOptions.map(type => ({
+                      value: type.type_id,
+                      label: type.type_name
+                    }))}
+                    placeholder={typeLoading ? "Loading types..." : "Select Project type"}
+                    variant="form"
+                    disabled={typeLoading || !!typeError}
+                    className="w-full pl-10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <div className="relative">
+                  <Circle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                  <Dropdown
+                    value={formData.status}
+                    onChange={(value) => handleChange({ target: { name: "status", value } })}
+                    options={statusOptions.map(status => ({
+                      value: status.status_id,
+                      label: status.status_name
+                    }))}
+                    placeholder={statusLoading ? "Loading statuses..." : "Select Project status"}
+                    variant="form"
+                    disabled={statusLoading || !!statusError}
+                    className="w-full pl-10"
+                  />
+                </div>
+              </div>
             </div>
-          </form>
+            {/* Add some bottom padding to ensure content doesn't hide behind sticky buttons */}
+            <div className="h-6"></div>
+          </div>
         </div>
 
         {/* Sticky Bottom Actions */}
-        <div className="flex gap-3 p-6 border-t border-gray-200 bg-white flex-shrink-0">
+        <div className="flex gap-3 p-6 border-t border-gray-200 bg-white flex-shrink-0 relative z-10">
           <button
             type="button"
             onClick={onClose}
@@ -364,9 +362,12 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
             Cancel
           </button>
           <button
-            type="submit"
+            type="button"
             disabled={loading}
-            onClick={handleSubmit}
+            onClick={(e) => {
+              e.preventDefault();
+              handleSubmit(e);
+            }}
             className="flex-1 bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
