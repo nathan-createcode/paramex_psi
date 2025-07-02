@@ -6,9 +6,28 @@ import uvicorn
 from groq_client import groq_client
 from scoring_logic import project_scorer
 from ux_safety_check import ux_safety_checker
+import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load environment variables from parent directory (psi_paramex/.env)
+load_dotenv(dotenv_path="../../.env")
 
 # Initialize FastAPI app
 app = FastAPI(title="ParameX PSI - AI Project Advisor API", version="1.0.0")
+
+# Initialize Supabase client
+supabase_url = os.getenv("VITE_SUPABASE_URL")
+supabase_key = os.getenv("VITE_SUPABASE_ANON_KEY")
+supabase: Client = None
+
+try:
+    if supabase_url and supabase_key:
+        supabase = create_client(supabase_url, supabase_key)
+        print("✅ Supabase client initialized successfully")
+except Exception as e:
+    print(f"⚠️ Warning: Could not initialize Supabase client: {e}")
+    print("Project context features will be disabled")
 
 # Configure CORS
 app.add_middleware(
@@ -28,6 +47,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     conversation_history: Optional[List[ChatMessage]] = []
+    user_id: Optional[str] = None  # Add user_id to get project context
 
 class ChatResponse(BaseModel):
     response: str
@@ -53,11 +73,59 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "AI Project Advisor API"}
 
+# New endpoint to get user projects for AI context
+@app.get("/api/user-projects/{user_id}")
+async def get_user_projects(user_id: str):
+    """
+    Get user projects for AI context
+    """
+    try:
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not configured")
+        
+        # Get projects with related data
+        response = supabase.table("projects").select(
+            """
+            project_id,
+            project_name,
+            client_name,
+            start_date,
+            deadline,
+            payment_amount,
+            difficulty_level,
+            type_id:type_id ( type_name ),
+            status_id:status_id ( status_name )
+            """
+        ).eq("user_id", user_id).order("created_at", desc=True).execute()
+        
+        if response.data:
+            # Format projects for AI context
+            formatted_projects = []
+            for project in response.data:
+                formatted_projects.append({
+                    "id": project["project_id"],
+                    "name": project["project_name"],
+                    "client": project["client_name"],
+                    "start_date": project["start_date"],
+                    "deadline": project["deadline"],
+                    "payment": project["payment_amount"],
+                    "difficulty": project["difficulty_level"],
+                    "type": project["type_id"]["type_name"] if project["type_id"] else "Unknown",
+                    "status": project["status_id"]["status_name"] if project["status_id"] else "Unknown"
+                })
+            
+            return {"projects": formatted_projects, "status": "success"}
+        else:
+            return {"projects": [], "status": "success"}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
+
 # Chat endpoint for project advice
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_advisor(request: ChatRequest):
     """
-    Chat with AI Project Advisor using Meta Llama model with safety checks
+    Chat with AI Project Advisor using Meta Llama model with safety checks and project context
     """
     try:
         if not request.message.strip():
@@ -70,6 +138,18 @@ async def chat_with_advisor(request: ChatRequest):
                 response=f"I understand you're looking for help, but I can only assist with project management topics. {safety_check['suggestion']}"
             )
         
+        # Get user projects for context if user_id is provided
+        project_context = ""
+        if request.user_id and supabase:
+            try:
+                projects_response = await get_user_projects(request.user_id)
+                if projects_response["projects"]:
+                    project_context = "\n\nYour Current Projects:\n"
+                    for project in projects_response["projects"]:
+                        project_context += f"- {project['name']} (Client: {project['client']}, Status: {project['status']}, Difficulty: {project['difficulty']}, Payment: ${project['payment']}, Deadline: {project['deadline']})\n"
+            except Exception as e:
+                print(f"Failed to get project context: {e}")
+        
         # Convert conversation history to the format expected by groq_client
         history = []
         if request.conversation_history:
@@ -79,9 +159,9 @@ async def chat_with_advisor(request: ChatRequest):
                     "content": msg.content
                 })
         
-        # Get AI response from Groq
+        # Get AI response from Groq with project context
         ai_response = await groq_client.get_project_advice(
-            user_message=request.message,
+            user_message=request.message + project_context,
             conversation_history=history
         )
         
