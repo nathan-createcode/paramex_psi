@@ -9,6 +9,8 @@ from ux_safety_check import ux_safety_checker
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from datetime import datetime
+import pytz
 
 # Load environment variables from parent directory (psi_paramex/.env)
 load_dotenv(dotenv_path="../../.env")
@@ -138,6 +140,11 @@ async def chat_with_advisor(request: ChatRequest):
                 response=f"I understand you're looking for help, but I can only assist with project management topics. {safety_check['suggestion']}"
             )
         
+        # Get current date and time for real-time context
+        jakarta_tz = pytz.timezone('Asia/Jakarta')
+        current_datetime = datetime.now(jakarta_tz)
+        current_date_context = f"\n\nCurrent Date & Time: {current_datetime.strftime('%A, %B %d, %Y at %I:%M %p')} (Jakarta Time)\n"
+        
         # Get user projects for context if user_id is provided
         project_context = ""
         if request.user_id and supabase:
@@ -146,7 +153,19 @@ async def chat_with_advisor(request: ChatRequest):
                 if projects_response["projects"]:
                     project_context = "\n\nYour Current Projects:\n"
                     for project in projects_response["projects"]:
-                        project_context += f"- {project['name']} (Client: {project['client']}, Status: {project['status']}, Difficulty: {project['difficulty']}, Payment: ${project['payment']}, Deadline: {project['deadline']})\n"
+                        # Calculate days until deadline
+                        try:
+                            deadline_date = datetime.strptime(project['deadline'], '%Y-%m-%d')
+                            days_until_deadline = (deadline_date - current_datetime.replace(tzinfo=None)).days
+                            deadline_info = f"Deadline: {project['deadline']}"
+                            if days_until_deadline >= 0:
+                                deadline_info += f" ({days_until_deadline} days remaining)"
+                            else:
+                                deadline_info += f" ({abs(days_until_deadline)} days overdue)"
+                        except:
+                            deadline_info = f"Deadline: {project['deadline']}"
+                        
+                        project_context += f"- {project['name']} (Client: {project['client']}, Status: {project['status']}, Difficulty: {project['difficulty']}, Payment: ${project['payment']}, {deadline_info})\n"
             except Exception as e:
                 print(f"Failed to get project context: {e}")
         
@@ -159,9 +178,9 @@ async def chat_with_advisor(request: ChatRequest):
                     "content": msg.content
                 })
         
-        # Get AI response from Groq with project context
+        # Get AI response from Groq with project context and current date/time
         ai_response = await groq_client.get_project_advice(
-            user_message=request.message + project_context,
+            user_message=request.message + current_date_context + project_context,
             conversation_history=history
         )
         
