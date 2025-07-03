@@ -43,6 +43,10 @@ export default function ProjectManagementPage() {
     key: null,
     direction: "asc",
   });
+  
+  // New state for dynamic max projects per month
+  const [maxProjectsPerMonth, setMaxProjectsPerMonth] = useState(10); // Default value
+  const [maxProjectsLoading, setMaxProjectsLoading] = useState(true);
 
   // Check authentication and fetch projects
   useEffect(() => {
@@ -60,7 +64,12 @@ export default function ProjectManagementPage() {
           return;
         }
         setUserId(session.user.id);
-        await fetchProjects(session.user.id);
+        
+        // Fetch both projects and user settings
+        await Promise.all([
+          fetchProjects(session.user.id),
+          fetchUserMaxProjects(session.user.id)
+        ]);
       } catch (err) {
         console.error("Auth error:", err);
         navigate("/login");
@@ -90,6 +99,40 @@ export default function ProjectManagementPage() {
       return () => clearTimeout(timer);
     }
   }, [formSuccess, formError]);
+
+  // New function to fetch user's max projects per month setting
+  const fetchUserMaxProjects = async (userId) => {
+    try {
+      setMaxProjectsLoading(true);
+      
+      const { data, error } = await supabase
+        .from("users")
+        .select("max_projects_per_month")
+        .eq("user_id", userId)
+        .single();
+
+      if (error) {
+        // If user record doesn't exist, use default value
+        if (error.code === "PGRST116") {
+          console.log("User record not found, using default max projects per month");
+          setMaxProjectsPerMonth(10);
+          return;
+        }
+        throw error;
+      }
+
+      // Use the user's setting or default to 10 if not set
+      const userMaxProjects = data?.max_projects_per_month || 10;
+      setMaxProjectsPerMonth(userMaxProjects);
+      
+    } catch (err) {
+      console.error("Error fetching user max projects setting:", err);
+      // Use default value on error
+      setMaxProjectsPerMonth(10);
+    } finally {
+      setMaxProjectsLoading(false);
+    }
+  };
 
   const updateOverdueProjects = async (projectsToCheck) => {
     const today = new Date();
@@ -257,16 +300,51 @@ export default function ProjectManagementPage() {
     }).length;
   }, [projects]);
 
-  const MAX_PROJECTS_PER_MONTH = 10;
+  // Enhanced dynamic project card color based on percentage thresholds
+  const projectCardColor = useMemo(() => {
+    if (maxProjectsLoading) {
+      return "bg-gray-100 border-gray-200 text-gray-600"; // Loading state
+    }
+    
+    // Calculate percentage of usage
+    const usagePercentage = maxProjectsPerMonth > 0 ? (currentMonthActiveProjects / maxProjectsPerMonth) * 100 : 0;
+    
+    if (usagePercentage >= 100) {
+      // Merah: Melebihi batas (≥ 100% dari batas)
+      return "bg-red-100 border-red-200 text-red-800";
+    } else if (usagePercentage >= 80) {
+      // Orange: Peringatan (≥ 80% dari batas)
+      return "bg-orange-100 border-orange-200 text-orange-800";
+    } else {
+      // Hijau/Putih: Normal (< 80% dari batas)
+      return "bg-white border-gray-100 text-gray-900";
+    }
+  }, [currentMonthActiveProjects, maxProjectsPerMonth, maxProjectsLoading]);
 
-  const projectCardColor =
-    currentMonthActiveProjects >= MAX_PROJECTS_PER_MONTH
-      ? "bg-red-100 border-red-200 text-red-800"
-      : currentMonthActiveProjects >= 8
-      ? "bg-orange-100 border-orange-200 text-orange-800"
-      : "bg-white border-gray-100 text-gray-900";
+  // Calculate usage percentage for display
+  const usagePercentage = useMemo(() => {
+    if (maxProjectsLoading || maxProjectsPerMonth === 0) return 0;
+    return Math.round((currentMonthActiveProjects / maxProjectsPerMonth) * 100);
+  }, [currentMonthActiveProjects, maxProjectsPerMonth, maxProjectsLoading]);
+
+  // Get status message based on usage
+  const getStatusMessage = () => {
+    if (maxProjectsLoading) return "Loading limit...";
+    
+    const percentage = usagePercentage;
+    
+    if (percentage >= 100) {
+      return "⚠️ You've reached your monthly limit";
+    } else if (percentage >= 80) {
+      return "⚠️ Approaching your monthly limit";
+    } else {
+      return `${percentage}% of monthly limit used`;
+    }
+  };
 
   console.log("Active Projects This Month:", currentMonthActiveProjects);
+  console.log("Max Projects Per Month (User Setting):", maxProjectsPerMonth);
+  console.log("Usage Percentage:", usagePercentage + "%");
 
   if (loading) {
     return (
@@ -324,7 +402,18 @@ export default function ProjectManagementPage() {
                   {currentMonthActiveProjects}
                 </h3>
                 <p className="text-xs text-gray-500">
-                  Max recommended: {MAX_PROJECTS_PER_MONTH}
+                  {maxProjectsLoading ? (
+                    "Loading limit..."
+                  ) : (
+                    `Max recommended: ${maxProjectsPerMonth}`
+                  )}
+                </p>
+                <p className={`text-xs mt-1 font-medium ${
+                  usagePercentage >= 100 ? 'text-red-600' : 
+                  usagePercentage >= 80 ? 'text-orange-600' : 
+                  'text-green-600'
+                }`}>
+                  {getStatusMessage()}
                 </p>
               </div>
             </div>
@@ -592,3 +681,4 @@ export default function ProjectManagementPage() {
     </Layout>
   );
 }
+

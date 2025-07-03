@@ -14,6 +14,7 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
     email: "",
     phone: "",
     company: "",
+    maxProjectsPerMonth: "", // Empty string for initial state
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -46,14 +47,14 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
       if (authError) {
-        console.error('Error getting user:', authError)
-        showMessage('Error loading user data', 'error')
+        console.error("Error getting user:", authError)
+        showMessage("Error loading user data", "error")
         return
       }
 
       if (!user) {
-        console.error('No user found')
-        showMessage('No user session found', 'error')
+        console.error("No user found")
+        showMessage("No user session found", "error")
         return
       }
 
@@ -61,9 +62,9 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
       // Get additional user data dari tabel users (jika ada)
       const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('name, phone_number')
-        .eq('user_id', user.id)
+        .from("users")
+        .select("name, phone_number, max_projects_per_month")
+        .eq("user_id", user.id)
         .single()
 
       // Populate form dengan data user
@@ -71,10 +72,12 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       
       setFormData(prev => ({
         ...prev,
-        fullName: userData?.name || userMetadata.full_name || userMetadata.display_name || '',
-        email: user.email || '',
-        phone: userData?.phone_number || userMetadata.phone || '',
-        company: userMetadata.company || '',
+        fullName: userData?.name || userMetadata.full_name || userMetadata.display_name || "",
+        email: user.email || "",
+        phone: userData?.phone_number || userMetadata.phone || "",
+        company: userMetadata.company || "",
+        // If max_projects_per_month is null or undefined, set to empty string for the input field
+        maxProjectsPerMonth: userData?.max_projects_per_month !== null && userData?.max_projects_per_month !== undefined ? userData.max_projects_per_month.toString() : "",
         // Reset password fields
         currentPassword: "",
         newPassword: "",
@@ -82,12 +85,12 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
         // Load preferences dari user_metadata jika ada
         emailNotifications: userMetadata.email_notifications !== undefined ? userMetadata.email_notifications : true,
         pushNotifications: userMetadata.push_notifications !== undefined ? userMetadata.push_notifications : false,
-        theme: userMetadata.theme || 'light',
+        theme: userMetadata.theme || "light",
       }))
 
     } catch (error) {
-      console.error('Error loading user data:', error)
-      showMessage('Failed to load user data', 'error')
+      console.error("Error loading user data:", error)
+      showMessage("Failed to load user data", "error")
     } finally {
       setLoading(false)
     }
@@ -100,14 +103,14 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
     }))
   }
 
-  const showMessage = (message, type = 'success') => {
+  const showMessage = (message, type = "success") => {
     const successMessage = document.createElement("div")
     successMessage.textContent = message
     successMessage.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      background: ${type === 'success' ? '#10B981' : '#EF4444'};
+      background: ${type === "success" ? "#10B981" : "#EF4444"};
       color: white;
       padding: 12px 24px;
       border-radius: 8px;
@@ -126,7 +129,21 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
   }
 
   const handleSaveProfile = async () => {
-    if (!currentUser) return
+    if (!currentUser) {
+      showMessage("No user session found", "error")
+      return
+    }
+
+    // Validate max projects per month
+    let maxProjectsToSave = null; // Default to null if empty or invalid
+    if (formData.maxProjectsPerMonth !== "") {
+      const parsedMaxProjects = parseInt(formData.maxProjectsPerMonth);
+      if (isNaN(parsedMaxProjects) || parsedMaxProjects < 1 || parsedMaxProjects > 50) {
+        showMessage("Max projects per month must be between 1 and 50", "error");
+        return;
+      }
+      maxProjectsToSave = parsedMaxProjects;
+    }
 
     try {
       setSaving(true)
@@ -143,39 +160,71 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
       if (authError) throw authError
 
-      // Update data di tabel users (jika ada)
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          name: formData.fullName,
-          phone_number: formData.phone,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', currentUser.id)
+      // Check if user record exists first
+      const { data: existingUser, error: checkError } = await supabase
+        .from("users")
+        .select("user_id")
+        .eq("user_id", currentUser.id)
+        .single()
 
-      // Jika record tidak ada, insert baru
-      if (updateError && updateError.code === 'PGRST116') {
+      if (checkError && checkError.code !== "PGRST116") {
+        throw checkError
+      }
+
+      if (existingUser) {
+        // User exists, update record
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({
+            name: formData.fullName,
+            phone_number: formData.phone,
+            max_projects_per_month: maxProjectsToSave,
+            updated_at: new Date().toISOString()
+          })
+          .eq("user_id", currentUser.id)
+
+        if (updateError) throw updateError
+      } else {
+        // User doesn't exist, insert new record
+        // Generate a default password for the password column (if required)
+        const defaultPassword = "temp_password_" + Math.random().toString(36).substring(2, 15);
+        
         const { error: insertError } = await supabase
-          .from('users')
+          .from("users")
           .insert([{
             user_id: currentUser.id,
             name: formData.fullName,
             email: formData.email,
             phone_number: formData.phone,
+            password: defaultPassword, // Add password field to satisfy NOT NULL constraint
+            max_projects_per_month: maxProjectsToSave,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }])
         
         if (insertError) throw insertError
-      } else if (updateError) {
-        throw updateError
       }
 
-      showMessage('Profile updated successfully!')
+      showMessage("Profile updated successfully!")
+      
+      // Reload user data to verify the save
+      setTimeout(() => {
+        loadUserData()
+      }, 1000)
       
     } catch (error) {
-      console.error('Error updating profile:', error)
-      showMessage('Failed to update profile', 'error')
+      console.error("Error updating profile:", error)
+      
+      // Provide more specific error messages
+      if (error.message?.includes("row-level security policy")) {
+        showMessage("Permission denied. Please contact administrator to set up proper database permissions.", "error")
+      } else if (error.message?.includes("duplicate key")) {
+        showMessage("User record already exists. Please try refreshing the page.", "error")
+      } else if (error.message?.includes("password")) {
+        showMessage("Database schema issue with password field. Please contact administrator.", "error")
+      } else {
+        showMessage(`Failed to update profile: ${error.message}`, "error")
+      }
     } finally {
       setSaving(false)
     }
@@ -185,12 +234,12 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
     if (!currentUser) return
 
     if (formData.newPassword !== formData.confirmPassword) {
-      showMessage('New passwords do not match', 'error')
+      showMessage("New passwords do not match", "error")
       return
     }
 
     if (formData.newPassword.length < 6) {
-      showMessage('Password must be at least 6 characters', 'error')
+      showMessage("Password must be at least 6 characters", "error")
       return
     }
 
@@ -211,11 +260,11 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
         confirmPassword: ""
       }))
 
-      showMessage('Password updated successfully!')
+      showMessage("Password updated successfully!")
       
     } catch (error) {
-      console.error('Error updating password:', error)
-      showMessage(error.message || 'Failed to update password', 'error')
+      console.error("Error updating password:", error)
+      showMessage(error.message || "Failed to update password", "error")
     } finally {
       setSaving(false)
     }
@@ -236,11 +285,11 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
       if (error) throw error
 
-      showMessage('Notification preferences saved!')
+      showMessage("Notification preferences saved!")
       
     } catch (error) {
-      console.error('Error saving notifications:', error)
-      showMessage('Failed to save notification preferences', 'error')
+      console.error("Error saving notifications:", error)
+      showMessage("Failed to save notification preferences", "error")
     } finally {
       setSaving(false)
     }
@@ -260,11 +309,11 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
       if (error) throw error
 
-      showMessage('Theme preference saved!')
+      showMessage("Theme preference saved!")
       
     } catch (error) {
-      console.error('Error saving theme:', error)
-      showMessage('Failed to save theme preference', 'error')
+      console.error("Error saving theme:", error)
+      showMessage("Failed to save theme preference", "error")
     } finally {
       setSaving(false)
     }
@@ -272,16 +321,16 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
   const handleSave = (section) => {
     switch (section) {
-      case 'Profile':
+      case "Profile":
         handleSaveProfile()
         break
-      case 'Password':
+      case "Password":
         handleSavePassword()
         break
-      case 'Notifications':
+      case "Notifications":
         handleSaveNotifications()
         break
-      case 'Theme':
+      case "Theme":
         handleSaveTheme()
         break
       default:
@@ -307,16 +356,16 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
   const renderContent = () => {
     if (loading) {
       return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
-          <div style={{ fontSize: '16px', color: '#6B7280' }}>Loading user data...</div>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "300px" }}>
+          <div style={{ fontSize: "16px", color: "#6B7280" }}>Loading user data...</div>
         </div>
       )
     }
 
-    switch (activeTab) {
-      case "profile":
-        return (
-          <div style={{ maxWidth: "500px" }}>
+    return (
+      <div style={{ maxWidth: "500px" }}>
+        {activeTab === "profile" && (
+          <>
             <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
               Profile Information
             </h2>
@@ -346,7 +395,7 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                 <input
                   type="email"
                   value={formData.email}
-                  style={{ ...styles.input, backgroundColor: '#F9FAFB', cursor: 'not-allowed' }}
+                  style={{ ...styles.input, backgroundColor: "#F9FAFB", cursor: "not-allowed" }}
                   readOnly
                   title="Email cannot be changed"
                 />
@@ -374,6 +423,23 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                   placeholder="Enter your company name"
                 />
               </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", gridColumn: "span 2" }}>
+                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>
+                  Maximum Projects Per Month
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={formData.maxProjectsPerMonth}
+                  onChange={(e) => handleInputChange("maxProjectsPerMonth", e.target.value)}
+                  style={styles.input}
+                  placeholder="Enter maximum projects per month"
+                />
+                <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>
+                  Set a monthly limit to help manage your workload (1-50 projects)
+                </p>
+              </div>
             </div>
             <button 
               style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
@@ -381,14 +447,13 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
               disabled={saving}
             >
               <Save size={16} />
-              {saving ? 'Saving...' : 'Save Profile'}
+              {saving ? "Saving..." : "Save Profile"}
             </button>
-          </div>
-        )
+          </>
+        )}
 
-      case "security":
-        return (
-          <div style={{ maxWidth: "500px" }}>
+        {activeTab === "security" && (
+          <>
             <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>Security</h2>
             <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
               Update your password to keep your account secure
@@ -428,14 +493,13 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
               disabled={saving || !formData.newPassword || !formData.confirmPassword}
             >
               <Save size={16} />
-              {saving ? 'Updating...' : 'Update Password'}
+              {saving ? "Updating..." : "Update Password"}
             </button>
-          </div>
-        )
+          </>
+        )}
 
-      case "notifications":
-        return (
-          <div style={{ maxWidth: "500px" }}>
+        {activeTab === "notifications" && (
+          <>
             <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
               Notifications
             </h2>
@@ -478,14 +542,13 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
               disabled={saving}
             >
               <Save size={16} />
-              {saving ? 'Saving...' : 'Save Preferences'}
+              {saving ? "Saving..." : "Save Preferences"}
             </button>
-          </div>
-        )
+          </>
+        )}
 
-      case "appearance":
-        return (
-          <div style={{ maxWidth: "500px" }}>
+        {activeTab === "appearance" && (
+          <>
             <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>Appearance</h2>
             <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
               Customize the look and feel of your interface
@@ -508,14 +571,12 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
               disabled={saving}
             >
               <Save size={16} />
-              {saving ? 'Saving...' : 'Save Theme'}
+              {saving ? "Saving..." : "Save Theme"}
             </button>
-          </div>
-        )
-
-      default:
-        return null
-    }
+          </>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -695,3 +756,4 @@ const styles = {
 }
 
 export default AccountSettingsModal
+
