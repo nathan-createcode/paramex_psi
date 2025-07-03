@@ -34,24 +34,23 @@ ChartJS.register(
   Filler,
 )
 
-// Project type mapping sesuai database
-const projectTypeMapping = {
-  1: "Website",
-  2: "Foto",
-  3: "Video",
-  4: "Game",
-  5: "Mobile Development",
-}
+// // Project type mapping sesuai database
+// const projectTypeMapping = {
+//   1: "Website",
+//   2: "Foto",
+//   3: "Video",
+//   4: "Game",
+//   5: "Mobile Development",
+// }
 
 
-// ANIN INI WARNA UNTUK TYPE!!
-const projectTypeColors = {
-  1: "#3B82F6", // Website - Blue
-  2: "#10B981", // Foto - Green
-  3: "#F59E0B", // Video - Yellow
-  4: "#8B5CF6", // Game - Purple
-  5: "#EF4444", // Mobile Development - Red
-}
+// const projectTypeColors = {
+//   1: "#3B82F6", // Website - Blue
+//   2: "#10B981", // Foto - Green
+//   3: "#F59E0B", // Video - Yellow
+//   4: "#8B5CF6", // Game - Purple
+//   5: "#EF4444", // Mobile Development - Red
+// }
 
 // Chart options
 const chartOptions = {
@@ -334,19 +333,23 @@ const Dashboard = () => {
 
   // Filter projects by selected time filter
   const filteredProjects = useMemo(() => {
-    if (timeFilter === "all") return projects
-
-    const monthsAgo = Number.parseInt(timeFilter)
-    const filterDate = new Date()
-    filterDate.setMonth(filterDate.getMonth() - monthsAgo)
-    const startOfFilterMonth = new Date(filterDate.getFullYear(), filterDate.getMonth(), 1)
-    const endOfFilterMonth = new Date(filterDate.getFullYear(), filterDate.getMonth() + 1, 0)
-
+    if (timeFilter === "all") return projects;
+  
+    const monthsAgo = parseInt(timeFilter, 10);
+    const targetMonth = subMonths(new Date(), monthsAgo);
+    const start = startOfMonth(targetMonth);
+    const end = endOfMonth(targetMonth);
+  
+    console.log(`🕒 Filtering for: ${monthsAgo} month(s) ago`);
+    console.log("Start of month:", start.toISOString());
+    console.log("End of month:", end.toISOString());
+  
     return projects.filter((project) => {
-      const projectDate = new Date(project.created_at)
-      return projectDate >= startOfFilterMonth && projectDate <= endOfFilterMonth
-    })
-  }, [projects, timeFilter])
+      const projectDate = new Date(project.start_date);
+      return isWithinInterval(projectDate, { start, end });
+    });
+  }, [projects, timeFilter]);
+  
 
   // Generate breakdown data for tooltip
   const statusBreakdownData = useMemo(() => {

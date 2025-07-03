@@ -26,3 +26,8 @@ DOCUMENTATION:
 - filter "overdue"
 - status "done" baru muncul kalo user pilih filter "done"
 - badge untuk difficulty
+
+03/07/2025 [21:45]
+- card max project 
+- filter dashboard
+- filter status (tambahin to do)
