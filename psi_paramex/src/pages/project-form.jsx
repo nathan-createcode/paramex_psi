@@ -123,43 +123,43 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     }));
   };
 
-  const getStatusDotColor = (statusName) => {
-    switch (statusName?.toLowerCase()) {
-      case 'on-process':
-        return 'text-yellow-500';
-      case 'on-plan':
-        return 'text-blue-500';
-      case 'done':
-        return 'text-green-500';
-      default:
-        return 'text-gray-400';
-    }
-  };
+  // const getStatusDotColor = (statusName) => {
+  //   switch (statusName?.toLowerCase()) {
+  //     case 'on-process':
+  //       return 'text-yellow-500';
+  //     case 'on-plan':
+  //       return 'text-blue-500';
+  //     case 'done':
+  //       return 'text-green-500';
+  //     default:
+  //       return 'text-gray-400';
+  //   }
+  // };
 
-  const getDifficultyDotColor = (difficulty) => {
-    switch (difficulty?.toLowerCase()) {
-      case 'low':
-        return 'text-green-500';
-      case 'medium':
-        return 'text-yellow-500';
-      case 'high':
-        return 'text-red-500';
-      default:
-        return 'text-gray-400';
-    }
-  };
+  // const getDifficultyDotColor = (difficulty) => {
+  //   switch (difficulty?.toLowerCase()) {
+  //     case 'low':
+  //       return 'text-green-500';
+  //     case 'medium':
+  //       return 'text-yellow-500';
+  //     case 'high':
+  //       return 'text-red-500';
+  //     default:
+  //       return 'text-gray-400';
+  //   }
+  // };
 
-  const getTypeDotColor = (typeId) => {
-    const colors = [
-      'text-purple-500',
-      'text-indigo-500', 
-      'text-pink-500',
-      'text-teal-500',
-      'text-orange-500',
-      'text-cyan-500'
-    ];
-    return colors[typeId % colors.length] || 'text-gray-400';
-  };
+  // const getTypeDotColor = (typeId) => {
+  //   const colors = [
+  //     'text-purple-500',
+  //     'text-indigo-500', 
+  //     'text-pink-500',
+  //     'text-teal-500',
+  //     'text-orange-500',
+  //     'text-cyan-500'
+  //   ];
+  //   return colors[typeId % colors.length] || 'text-gray-400';
+  // };
 
   return (
     <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center p-4 z-[9999]">

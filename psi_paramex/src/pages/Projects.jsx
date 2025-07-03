@@ -18,7 +18,7 @@ export default function ProjectManagementPage() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
-    status: "all",
+    status: "To Do",
     difficulty: "all",
     deadline: "all",
   });
@@ -99,19 +99,18 @@ export default function ProjectManagementPage() {
         p.status.toLowerCase() !== "done" &&
         p.status.toLowerCase() !== "overdue"
     );
-  
+
     for (const proj of overdueProjects) {
       try {
         await supabase
           .from("projects")
-          .update({ status_id: "4" }) 
+          .update({ status_id: "4" })
           .eq("project_id", proj.id);
       } catch (err) {
         console.error("Failed to update project to overdue:", proj.name, err);
       }
     }
   };
-  
 
   const fetchProjects = async (userId) => {
     try {
@@ -144,7 +143,6 @@ export default function ProjectManagementPage() {
 
       setProjects(mapped);
       await updateOverdueProjects(mapped);
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -163,15 +161,27 @@ export default function ProjectManagementPage() {
   const filteredProjects = useMemo(() => {
     const filtered = filterProjects(projects, searchQuery, filters);
 
-    // Sembunyikan proyek "done" secara default jika filter status bukan "done"
-    const hideDoneUnlessFiltered =
-      filters.status.toLowerCase() !== "done"
-        ? filtered.filter((project) => project.status.toLowerCase() !== "done")
-        : filtered;
+    let filteredByStatus = filtered;
+
+    if (filters.status === "To Do") {
+      filteredByStatus = filtered.filter((project) => {
+        const status = project.status.toLowerCase();
+        return (
+          status === "on-plan" ||
+          status === "on-process" ||
+          status === "overdue"
+        );
+      });
+    } else if (filters.status.toLowerCase() !== "all") {
+      filteredByStatus = filtered.filter(
+        (project) =>
+          project.status.toLowerCase() === filters.status.toLowerCase()
+      );
+    }
 
     // Apply sorting if sortConfig is set
     if (sortConfig.key) {
-      const sorted = [...hideDoneUnlessFiltered].sort((a, b) => {
+      const sorted = [...filteredByStatus].sort((a, b) => {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
 
@@ -216,7 +226,7 @@ export default function ProjectManagementPage() {
       return sorted;
     }
 
-    return hideDoneUnlessFiltered;
+    return filteredByStatus;
   }, [projects, searchQuery, filters, sortConfig]);
 
   const displayProjects = filteredProjects.map((project) => ({
@@ -224,6 +234,39 @@ export default function ProjectManagementPage() {
     startDate: formatDate(project.startDate),
     deadline: formatDate(project.deadline),
   }));
+
+  const currentMonthActiveProjects = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    return projects.filter((project) => {
+      const status = project.status?.toLowerCase();
+      const rawStartDate = project.startDateRaw || project.startDate || ""; // backup
+      const parsedDate = new Date(rawStartDate);
+
+      const isActiveStatus =
+        status === "on-plan" || status === "on-process" || status === "overdue";
+
+      return (
+        isActiveStatus &&
+        !isNaN(parsedDate) &&
+        parsedDate.getMonth() === currentMonth &&
+        parsedDate.getFullYear() === currentYear
+      );
+    }).length;
+  }, [projects]);
+
+  const MAX_PROJECTS_PER_MONTH = 10;
+
+  const projectCardColor =
+    currentMonthActiveProjects >= MAX_PROJECTS_PER_MONTH
+      ? "bg-red-100 border-red-200 text-red-800"
+      : currentMonthActiveProjects >= 8
+      ? "bg-orange-100 border-orange-200 text-orange-800"
+      : "bg-white border-gray-100 text-gray-900";
+
+  console.log("Active Projects This Month:", currentMonthActiveProjects);
 
   if (loading) {
     return (
@@ -258,13 +301,34 @@ export default function ProjectManagementPage() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Project Management
-          </h1>
-          <p className="text-gray-600">
-            Manage and track all your freelance projects
-          </p>
+        <div className="grid grid-cols-2">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Project Management
+            </h1>
+            <p className="text-gray-600">
+              Manage and track all your freelance projects
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div></div>
+            <div></div>
+            <div
+              className={`rounded-2xl p-3 flex items-center gap-4 shadow-md/5 transition-all duration-200 border cursor-default ${projectCardColor}`}
+            >
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Projects This Month
+                </p>
+                <h3 className="text-2xl font-bold">
+                  {currentMonthActiveProjects}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Max recommended: {MAX_PROJECTS_PER_MONTH}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <SearchAndFilters

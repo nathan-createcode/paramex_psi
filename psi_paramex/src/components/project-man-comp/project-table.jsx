@@ -5,7 +5,6 @@ import { ChevronUp, ChevronDown, MoreVertical, MoreHorizontal } from "lucide-rea
 
 export default function ProjectTable({
   projects,
-  onRowClick,
   onContextAction,
   sortConfig,
   onSort,
