@@ -3,13 +3,16 @@
 import { useState, useEffect } from "react"
 import { ChevronDown, ChevronUp, TrendingUp, AlertTriangle } from "lucide-react"
 import { supabase } from "../supabase/supabase"
+import { useNavigate } from "react-router-dom"
 import Layout from "../components/Layout"
 
 const DSS = () => {
+  const navigate = useNavigate()
   const [expandedProjects, setExpandedProjects] = useState(new Set())
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [user, setUser] = useState(null)
 
   /**
    * Priority Score Calculation Formula:
@@ -27,55 +30,80 @@ const DSS = () => {
   // Updated normalization function for max score 81
   const normalizeScore = (rawScore) => Math.round((rawScore / 81) * 100)
 
-  // Fetch projects from database
+  // Check authentication first
   useEffect(() => {
-    const fetchProjects = async () => {
+    const checkAuth = async () => {
       try {
-        setLoading(true)
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
 
-        // Fetch projects with status not equal to "Done" (status_id !== 3)
-        const { data, error } = await supabase
-          .from("projects")
-          .select(`
-            *,
-            project_status(status_name),
-            project_type(type_name)
-          `)
-          .neq("status_id", 3) // Exclude projects with status "Done"
-          .order("priority_score", { ascending: false })
+        if (sessionError) throw sessionError
 
-        if (error) {
-          console.error("Error fetching projects:", error)
+        if (!session) {
+          navigate("/login")
           return
         }
 
-        // Transform data to match the expected format
-        const transformedProjects = data.map((project) => ({
-          id: project.project_id,
-          project_name: project.project_name,
-          client_name: project.client_name,
-          priority_score: project.priority_score || 0,
-          deadline_score: project.deadline_score || 1,
-          payment_score: project.payment_score || 1,
-          difficulty_score: project.difficulty_score || 1,
-          payment_amount: project.payment_amount || 0,
-          difficulty_level: project.difficulty_level || "Low",
-          deadline: project.deadline,
-          days_until_deadline: project.deadline
-            ? Math.ceil((new Date(project.deadline) - new Date()) / (1000 * 60 * 60 * 24))
-            : 0,
-        }))
-
-        setProjects(transformedProjects)
+        setUser(session.user)
+        await fetchProjects(session.user.id)
       } catch (error) {
-        console.error("Error:", error)
-      } finally {
-        setLoading(false)
+        console.error("Auth error:", error)
+        navigate("/login")
       }
     }
 
-    fetchProjects()
-  }, [])
+    checkAuth()
+  }, [navigate])
+
+  // Fetch projects from database - FIXED: Added user filtering
+  const fetchProjects = async (userId) => {
+    try {
+      setLoading(true)
+
+      // FIXED: Added user_id filter and made status filter optional
+      const { data, error } = await supabase
+        .from("projects")
+        .select(`
+          *,
+          project_status(status_name),
+          project_type(type_name)
+        `)
+        .eq("user_id", userId) // FIXED: Filter by current user
+        .neq("status_id", 3) // Exclude projects with status "Done" for DSS prioritization
+        .order("priority_score", { ascending: false })
+
+      if (error) {
+        console.error("Error fetching projects:", error)
+        return
+      }
+
+      // Transform data to match the expected format
+      const transformedProjects = data.map((project) => ({
+        id: project.project_id,
+        project_name: project.project_name,
+        client_name: project.client_name,
+        priority_score: project.priority_score || 0,
+        deadline_score: project.deadline_score || 1,
+        payment_score: project.payment_score || 1,
+        difficulty_score: project.difficulty_score || 1,
+        payment_amount: project.payment_amount || 0,
+        difficulty_level: project.difficulty_level || "Low",
+        deadline: project.deadline,
+        days_until_deadline: project.deadline
+          ? Math.ceil((new Date(project.deadline) - new Date()) / (1000 * 60 * 60 * 24))
+          : 0,
+      }))
+
+      console.log(`DSS: Loaded ${transformedProjects.length} projects for user ${userId}`)
+      setProjects(transformedProjects)
+    } catch (error) {
+      console.error("Error:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   /**
    * Badge Logic Implementation:
@@ -116,7 +144,50 @@ const DSS = () => {
     return projectsWithBadges
   }
 
-  const projectsWithBadges = calculateBadges(projects)
+  // Advanced Tie-Breaking System
+  const advancedSort = (projects) => {
+    return projects.sort((a, b) => {
+      // Primary sort: Priority Score (descending)
+      if (a.priority_score !== b.priority_score) {
+        return b.priority_score - a.priority_score
+      }
+
+      // Secondary sort: Advanced tie-breaking for same priority_score
+      // 1. Deadline tie-breaking (for deadline_score = 1, sort by days ascending)
+      if (a.deadline_score === 1 && b.deadline_score === 1 && a.deadline_score === b.deadline_score) {
+        if (a.days_until_deadline !== b.days_until_deadline) {
+          return a.days_until_deadline - b.days_until_deadline // Lower days = higher priority
+        }
+      }
+
+      // 2. Payment tie-breaking (for payment_score = 3, sort by amount descending)
+      if (a.payment_score === 3 && b.payment_score === 3 && a.payment_score === b.payment_score) {
+        if (a.payment_amount !== b.payment_amount) {
+          return b.payment_amount - a.payment_amount // Higher amount = higher priority
+        }
+      }
+
+      // 3. General deadline comparison (higher deadline_score = higher priority)
+      if (a.deadline_score !== b.deadline_score) {
+        return b.deadline_score - a.deadline_score
+      }
+
+      // 4. General payment comparison (higher payment_score = higher priority)
+      if (a.payment_score !== b.payment_score) {
+        return b.payment_score - a.payment_score
+      }
+
+      // 5. Difficulty comparison (higher difficulty_score = higher priority)
+      if (a.difficulty_score !== b.difficulty_score) {
+        return b.difficulty_score - a.difficulty_score
+      }
+
+      // Final fallback: alphabetical by project name
+      return a.project_name.localeCompare(b.project_name)
+    })
+  }
+
+  const projectsWithBadges = advancedSort(calculateBadges(projects))
 
   // Filter projects based on search query
   const filteredProjectsWithBadges = projectsWithBadges.filter((project) => {
@@ -139,21 +210,53 @@ const DSS = () => {
     setExpandedProjects(newExpanded)
   }
 
-  // Updated deadline category mapping based on database trigger
-  const getDeadlineCategory = (score) => {
-    switch (score) {
-      case 5:
-        return "Due Tomorrow"
-      case 4:
-        return "Urgent Deadline"
-      case 3:
-        return "Upcoming Deadline"
-      case 2:
-        return "On Track"
-      case 1:
-        return "Planned"
-      default:
-        return "Unknown"
+  // Helper function to get deadline level name from days left (REAL-TIME)
+  const getDeadlineLevelFromDays = (daysLeft) => {
+    if (daysLeft <= 1) {
+      return "Super Urgent"
+    } else if (daysLeft === 2) {
+      return "Urgent"
+    } else if (daysLeft >= 3 && daysLeft <= 5) {
+      return "High"
+    } else if (daysLeft >= 6 && daysLeft <= 9) {
+      return "Medium"
+    } else {
+      return "Low"
+    }
+  }
+
+  // Update getDeadlineCategory to use days left instead of score
+  const getDeadlineCategory = (daysLeft) => {
+    if (daysLeft <= 1) {
+      return "Super Urgent"
+    } else if (daysLeft === 2) {
+      return "Urgent"
+    } else if (daysLeft >= 3 && daysLeft <= 5) {
+      return "High"
+    } else if (daysLeft >= 6 && daysLeft <= 9) {
+      return "Medium"
+    } else {
+      return "Low"
+    }
+  }
+
+  // Update getDeadlineBadgeStyle to use days left
+  const getDeadlineBadgeStyle = (daysLeft) => {
+    if (daysLeft <= 1) {
+      // Super Urgent: Dark Red
+      return { backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }
+    } else if (daysLeft === 2) {
+      // Urgent: Red
+      return { backgroundColor: "#FEF2F2", color: "#EF4444", border: "1px solid #FECACA" }
+    } else if (daysLeft >= 3 && daysLeft <= 5) {
+      // High: Orange
+      return { backgroundColor: "#FFF7ED", color: "#F97316", border: "1px solid #FED7AA" }
+    } else if (daysLeft >= 6 && daysLeft <= 9) {
+      // Medium: Yellow
+      return { backgroundColor: "#FFFBEB", color: "#EAB308", border: "1px solid #FDE68A" }
+    } else {
+      // Low: Green
+      return { backgroundColor: "#ECFDF5", color: "#22C55E", border: "1px solid #A7F3D0" }
     }
   }
 
@@ -170,28 +273,28 @@ const DSS = () => {
     }
   }
 
-  // Updated deadline badge style with 5-level color hierarchy
-  const getDeadlineBadgeStyle = (deadlineScore) => {
-    switch (deadlineScore) {
-      case 5:
-        // Due Tomorrow → Red
-        return { backgroundColor: "#FEF2F2", color: "#F87171", border: "1px solid #FECACA" }
-      case 4:
-        // Urgent Deadline → Orange
-        return { backgroundColor: "#FFF7ED", color: "#FDBA74", border: "1px solid #FED7AA" }
-      case 3:
-        // Upcoming Deadline → Amber
-        return { backgroundColor: "#FFFBEB", color: "#FCD34D", border: "1px solid #FDE68A" }
-      case 2:
-        // On Track → Green
-        return { backgroundColor: "#ECFDF5", color: "#34D399", border: "1px solid #A7F3D0" }
-      case 1:
-        // Planned → Blue
-        return { backgroundColor: "#EFF6FF", color: "#60A5FA", border: "1px solid #BFDBFE" }
-      default:
-        return { backgroundColor: "#F7FAFC", color: "#718096", border: "1px solid #E2E8F0" }
-    }
-  }
+  // Updated deadline badge style with exact color hierarchy
+  // const getDeadlineBadgeStyle = (deadlineScore) => {
+  //   switch (deadlineScore) {
+  //     case 5:
+  //       // Score 5: Dark Red
+  //       return { backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }
+  //     case 4:
+  //       // Score 4: Red
+  //       return { backgroundColor: "#FEF2F2", color: "#EF4444", border: "1px solid #FECACA" }
+  //     case 3:
+  //       // Score 3: Orange
+  //       return { backgroundColor: "#FFF7ED", color: "#F97316", border: "1px solid #FED7AA" }
+  //     case 2:
+  //       // Score 2: Yellow
+  //       return { backgroundColor: "#FFFBEB", color: "#EAB308", border: "1px solid #FDE68A" }
+  //     case 1:
+  //       // Score 1: Green
+  //       return { backgroundColor: "#ECFDF5", color: "#22C55E", border: "1px solid #A7F3D0" }
+  //     default:
+  //       return { backgroundColor: "#F7FAFC", color: "#718096", border: "1px solid #E2E8F0" }
+  //   }
+  // }
 
   // Payment badge style (unchanged)
   const getPaymentBadgeStyle = (paymentScore) => {
@@ -228,22 +331,22 @@ const DSS = () => {
   }
 
   // Helper function to get deadline level name from score
-  const getDeadlineLevelFromScore = (deadlineScore) => {
-    switch (deadlineScore) {
-      case 5:
-        return "Due Tomorrow"
-      case 4:
-        return "Urgent"
-      case 3:
-        return "Upcoming"
-      case 2:
-        return "On Track"
-      case 1:
-        return "Planned"
-      default:
-        return "Unknown"
-    }
-  }
+  // const getDeadlineLevelFromScore = (deadlineScore) => {
+  //   switch (deadlineScore) {
+  //     case 5:
+  //       return "Super Urgent"
+  //     case 4:
+  //       return "Urgent"
+  //     case 3:
+  //       return "High"
+  //     case 2:
+  //       return "Medium"
+  //     case 1:
+  //       return "Low"
+  //     default:
+  //       return "Unknown"
+  //   }
+  // }
 
   // Payment level mapping (unchanged)
   const getPaymentLevel = (paymentScore) => {
@@ -294,7 +397,15 @@ const DSS = () => {
               <h1 style={styles.title}>
                 Project Prioritization <span style={styles.titleAccent}>DSS</span>
               </h1>
-              <p style={styles.subtitle}>Prioritaskan proyek berdasarkan sistem skor terstruktur berbasis DSS</p>
+              <p style={styles.subtitle}>
+                Prioritaskan proyek berdasarkan sistem skor terstruktur berbasis DSS
+                {user && (
+                  <span style={{ display: "block", fontSize: "14px", marginTop: "4px", color: "#718096" }}>
+                    Showing {filteredProjectsWithBadges.length} active projects for{" "}
+                    {user.user_metadata?.full_name || user.email}
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         </div>
@@ -360,11 +471,11 @@ const DSS = () => {
                         <span
                           style={{
                             ...styles.factorBadge,
-                            ...getDeadlineBadgeStyle(project.deadline_score),
+                            ...getDeadlineBadgeStyle(project.days_until_deadline),
                           }}
                         >
-                          Deadline: {getDeadlineLevelFromScore(project.deadline_score)} ({project.days_until_deadline}{" "}
-                          days left)
+                          Deadline: {getDeadlineLevelFromDays(project.days_until_deadline)} (
+                          {project.days_until_deadline} days left)
                         </span>
                         <span
                           style={{
@@ -425,7 +536,7 @@ const DSS = () => {
                       <ul style={styles.reasoningList}>
                         <li>
                           Deadline: (batas waktu {project.days_until_deadline} hari lagi, kategori{" "}
-                          {getDeadlineCategory(project.deadline_score)})
+                          {getDeadlineCategory(project.days_until_deadline)})
                         </li>
                         <li>
                           Payment: (nilai pembayaran ${project.payment_amount.toLocaleString()}, kategori{" "}
@@ -450,6 +561,18 @@ const DSS = () => {
                   </p>
                   <button onClick={() => setSearchQuery("")} style={styles.clearSearchButton}>
                     Hapus Pencarian
+                  </button>
+                </div>
+              )}
+              {filteredProjectsWithBadges.length === 0 && !searchQuery && (
+                <div style={styles.emptySearchState}>
+                  <div style={styles.emptySearchIcon}>📊</div>
+                  <h3 style={styles.emptySearchTitle}>Tidak ada proyek aktif</h3>
+                  <p style={styles.emptySearchDescription}>
+                    Semua proyek Anda sudah selesai atau belum ada proyek yang perlu diprioritaskan.
+                  </p>
+                  <button onClick={() => navigate("/projects")} style={styles.clearSearchButton}>
+                    Kelola Proyek
                   </button>
                 </div>
               )}
