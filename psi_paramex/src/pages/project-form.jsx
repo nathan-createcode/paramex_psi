@@ -29,6 +29,14 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState(null);
 
+  // Get today's date in YYYY-MM-DD format for min attribute
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  const todayDate = getTodayDate();
+
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -85,6 +93,30 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Additional validation before submit
+    if (!editMode) {
+      const startDate = new Date(formData.startDate);
+      const deadline = new Date(formData.deadline);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+      
+      if (startDate < today) {
+        alert("Start date cannot be in the past");
+        return;
+      }
+      
+      if (deadline < today) {
+        alert("Deadline cannot be in the past");
+        return;
+      }
+      
+      if (deadline < startDate) {
+        alert("Deadline cannot be before start date");
+        return;
+      }
+    }
+    
     await onSubmit(formData);
   };
 
@@ -117,6 +149,37 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Special handling for date fields when not in edit mode
+    if (!editMode && (name === "startDate" || name === "deadline")) {
+      const selectedDate = new Date(value);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        alert(`${name === "startDate" ? "Start date" : "Deadline"} cannot be in the past`);
+        return;
+      }
+      
+      // If setting deadline, make sure it's not before start date
+      if (name === "deadline" && formData.startDate) {
+        const startDate = new Date(formData.startDate);
+        if (selectedDate < startDate) {
+          alert("Deadline cannot be before start date");
+          return;
+        }
+      }
+      
+      // If setting start date, make sure existing deadline is not before it
+      if (name === "startDate" && formData.deadline) {
+        const deadlineDate = new Date(formData.deadline);
+        if (deadlineDate < selectedDate) {
+          alert("Start date cannot be after deadline");
+          return;
+        }
+      }
+    }
+    
     setFormData((prev) => ({
       ...prev,
       [name]: name === "payment" ? parseCurrency(value) : value,
@@ -236,6 +299,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleChange}
+                      min={!editMode ? todayDate : undefined}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     />
@@ -253,6 +317,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       name="deadline"
                       value={formData.deadline}
                       onChange={handleChange}
+                      min={!editMode ? (formData.startDate || todayDate) : undefined}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     />

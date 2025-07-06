@@ -48,6 +48,37 @@ export default function ProjectManagementPage() {
   const [maxProjectsPerMonth, setMaxProjectsPerMonth] = useState(10); // Default value
   const [maxProjectsLoading, setMaxProjectsLoading] = useState(true);
 
+  // Fungsi helper untuk menghitung posisi menu yang aman
+  const calculateSafeMenuPosition = (x, y, menuWidth = 144, menuHeight = 80) => {
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    let safeX = x;
+    let safeY = y;
+    
+    // Cek apakah menu akan keluar dari sisi kanan layar
+    if (x + menuWidth > windowWidth) {
+      safeX = windowWidth - menuWidth - 20; // 20px padding dari tepi
+    }
+    
+    // Cek apakah menu akan keluar dari sisi kiri layar
+    if (safeX < 20) {
+      safeX = 20; // 20px padding dari tepi kiri
+    }
+    
+    // Cek apakah menu akan keluar dari sisi bawah layar
+    if (y + menuHeight > windowHeight) {
+      safeY = windowHeight - menuHeight - 20; // 20px padding dari tepi bawah
+    }
+    
+    // Cek apakah menu akan keluar dari sisi atas layar
+    if (safeY < 20) {
+      safeY = 20; // 20px padding dari tepi atas
+    }
+    
+    return { x: safeX, y: safeY };
+  };
+
   // Check authentication and fetch projects
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -451,10 +482,18 @@ export default function ProjectManagementPage() {
           sortConfig={sortConfig}
           onSort={handleSort}
           onContextAction={(project, position) => {
+            // Hitung posisi yang aman sebelum menampilkan menu
+            const safePosition = calculateSafeMenuPosition(
+              position.x, 
+              position.y, 
+              144, // width menu
+              80   // height menu
+            );
+            
             setContextMenu({
               visible: true,
-              x: position.x,
-              y: position.y,
+              x: safePosition.x,
+              y: safePosition.y,
               project,
             });
           }}
@@ -582,16 +621,17 @@ export default function ProjectManagementPage() {
         />
       )}
 
+      {/* CONTEXT MENU YANG SUDAH DIPERBAIKI */}
       {contextMenu.visible && (
         <div
-          className="absolute z-50 bg-white border border-gray-100 rounded-lg shadow-md w-36"
+          className="fixed z-50 bg-white border border-gray-100 rounded-lg shadow-lg w-36 py-1"
           style={{
             top: contextMenu.y,
             left: contextMenu.x,
           }}
         >
           <button
-            className=" flex items-center w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg"
+            className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700 text-sm"
             onClick={async () => {
               setContextMenu((prev) => ({ ...prev, visible: false }));
               setEditFormLoading(true);
@@ -628,7 +668,7 @@ export default function ProjectManagementPage() {
             Edit
           </button>
           <button
-            className="flex items-center w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
+            className="flex items-center w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 text-sm"
             onClick={() => {
               setContextMenu((prev) => ({ ...prev, visible: false }));
               setShowDeleteConfirm(true);
@@ -670,7 +710,7 @@ export default function ProjectManagementPage() {
                     setDeleteLoading(false);
                   }
                 }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-red-700"
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-700"
               >
                 {deleteLoading ? "Deleting..." : "Delete"}
               </button>
@@ -681,4 +721,3 @@ export default function ProjectManagementPage() {
     </Layout>
   );
 }
-
