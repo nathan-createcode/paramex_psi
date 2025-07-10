@@ -72,6 +72,7 @@ const DSS = () => {
         `)
         .eq("user_id", userId) // FIXED: Filter by current user
         .neq("status_id", 3) // Exclude projects with status "Done" for DSS prioritization
+        .neq("status_id", 4)
         .order("priority_score", { ascending: false })
 
       if (error) {
