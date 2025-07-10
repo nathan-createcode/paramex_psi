@@ -402,8 +402,24 @@ const DSS = () => {
                 Prioritaskan proyek berdasarkan sistem skor terstruktur berbasis DSS
                 {user && (
                   <span style={{ display: "block", fontSize: "14px", marginTop: "4px", color: "#718096" }}>
-                    Showing {filteredProjectsWithBadges.length} active projects for{" "}
-                    {user.user_metadata?.full_name || user.email}
+                    Showing{" "}
+                    <span
+                      style={{
+                        backgroundColor: "#EBF4FF",
+                        color: "#3B82F6",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontSize: "13px",
+                        fontWeight: "1000",
+                        display: "inline",
+                        marginLeft: "2px",
+                        marginRight: "2px",
+                        border: "1px solid #BFDBFE",
+                      }}
+                    >
+                      {filteredProjectsWithBadges.length} active projects
+                    </span>{" "}
+                    for {user.user_metadata?.full_name || user.email}
                   </span>
                 )}
               </p>
