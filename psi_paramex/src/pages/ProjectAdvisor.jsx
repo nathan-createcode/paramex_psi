@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
+import { BotMessageSquare, History, Save, Trash2, Plus, FolderOpen } from "lucide-react"
 
 const ProjectAdvisor = () => {
   // Load messages from localStorage or use default
@@ -32,6 +33,34 @@ const ProjectAdvisor = () => {
       },
     ]
   })
+  
+  // History management states
+  const [savedSessions, setSavedSessions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('projectAdvisorSessions')
+      if (saved) {
+        const sessions = JSON.parse(saved)
+        // Sort by createdAt timestamp, newest first - maintains consistent order
+        return sessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      }
+      return []
+    } catch (error) {
+      console.error('Error loading saved sessions:', error)
+      return []
+    }
+  })
+  
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    try {
+      return localStorage.getItem('projectAdvisorCurrentSessionId') || null
+    } catch (error) {
+      console.error('Error loading current session ID:', error)
+      return null
+    }
+  })
+  const [showHistoryPanel, setShowHistoryPanel] = useState(true)
+  const [isLoadingSession, setIsLoadingSession] = useState(false)
+  
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [isRevealing, setIsRevealing] = useState(false)
@@ -42,6 +71,8 @@ const ProjectAdvisor = () => {
   const [userProjects, setUserProjects] = useState([])
   const messagesEndRef = useRef(null)
   const typewriterTimeoutRef = useRef(null)
+  const sessionIdRef = useRef(null) // Use ref to avoid race conditions
+  const autoSaveTimeoutRef = useRef(null) // Debounce auto-save
   const navigate = useNavigate()
 
   // Authentication check
@@ -73,6 +104,16 @@ const ProjectAdvisor = () => {
     checkAuth()
   }, [navigate])
 
+  // Initialize sessionIdRef from currentSessionId on mount
+  useEffect(() => {
+    if (currentSessionId && !sessionIdRef.current) {
+      sessionIdRef.current = currentSessionId
+      console.log('🔄 Restored session ID from localStorage:', currentSessionId)
+    }
+  }, [currentSessionId])
+
+
+
   // Scroll to bottom when new messages are added
   useEffect(() => {
     scrollToBottom()
@@ -84,6 +125,9 @@ const ProjectAdvisor = () => {
       if (typewriterTimeoutRef.current) {
         clearTimeout(typewriterTimeoutRef.current)
       }
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -91,10 +135,107 @@ const ProjectAdvisor = () => {
   useEffect(() => {
     try {
       localStorage.setItem('projectAdvisorMessages', JSON.stringify(messages))
+      
+      console.log('📝 Messages changed:', {
+        messageCount: messages.length,
+        isLoadingSession,
+        sessionId: sessionIdRef.current,
+        shouldAutoSave: messages.length > 1 && !isLoadingSession
+      })
+      
+      // Auto-save session when there are actual conversation messages (more than just the initial AI greeting)
+      if (messages.length > 1 && !isLoadingSession) {
+        // Clear existing timeout to debounce auto-save
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current)
+        }
+        
+        // Debounce auto-save by 500ms to prevent rapid duplicate saves
+        autoSaveTimeoutRef.current = setTimeout(() => {
+          console.log('🚀 Triggering debounced auto-save...')
+          autoSaveCurrentSession()
+        }, 500)
+      }
     } catch (error) {
       console.error('Error saving messages to localStorage:', error)
     }
-  }, [messages])
+  }, [messages, isLoadingSession])
+
+  // Auto-save function
+  const autoSaveCurrentSession = () => {
+    // Generate session name from first user message or use default
+    let sessionName = "New Conversation"
+    const firstUserMessage = messages.find(msg => msg.type === "user")
+    
+    if (firstUserMessage) {
+      // Use first 30 characters of first user message as session name
+      sessionName = firstUserMessage.content.substring(0, 30).trim()
+      if (firstUserMessage.content.length > 30) {
+        sessionName += "..."
+      }
+    }
+    
+    // Use ref to avoid race conditions - generate ID only once per conversation
+    if (!sessionIdRef.current) {
+      const timestamp = Date.now()
+      const randomId = Math.random().toString(36).substr(2, 9)
+      sessionIdRef.current = `session_${timestamp}_${randomId}`
+      setCurrentSessionId(sessionIdRef.current)
+      localStorage.setItem('projectAdvisorCurrentSessionId', sessionIdRef.current)
+      console.log('🆔 Generated new session ID:', sessionIdRef.current)
+    }
+    
+    const sessionId = sessionIdRef.current
+    const existingSession = savedSessions.find(s => s.id === sessionId)
+    
+    // Don't auto-save if session already exists with same message count (prevents duplicates on page refresh)
+    if (existingSession && existingSession.messageCount === messages.length) {
+      console.log('⏭️ Skipping auto-save: session already up-to-date', {
+        sessionId,
+        existingMessageCount: existingSession.messageCount,
+        currentMessageCount: messages.length
+      })
+      return
+    }
+    
+    console.log('💾 Auto-saving session:', {
+      sessionId,
+      sessionName,
+      messagesCount: messages.length,
+      isNewSession: !existingSession
+    })
+    
+    const sessionData = {
+      id: sessionId,
+      name: existingSession ? existingSession.name : sessionName,
+      messages: messages,
+      createdAt: existingSession ? existingSession.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messageCount: messages.length
+    }
+    
+    // Update existing session in-place or add new one
+    const updatedSessions = savedSessions.map(s => 
+      s.id === sessionId ? sessionData : s
+    )
+    
+    // Add new session if it doesn't exist
+    if (!existingSession) {
+      updatedSessions.unshift(sessionData)
+    }
+    
+    // Sort by createdAt timestamp to maintain consistent order
+    const sortedSessions = updatedSessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    
+    // Keep only the last 50 sessions for more history
+    const limitedSessions = sortedSessions.slice(0, 50)
+    
+    setSavedSessions(limitedSessions)
+    // currentSessionId already set above when generating new ID
+    localStorage.setItem('projectAdvisorSessions', JSON.stringify(limitedSessions))
+    
+    console.log('✅ Session saved successfully. Total sessions:', limitedSessions.length)
+  }
 
   // Function to clear chat history
   const clearChatHistory = () => {
@@ -105,7 +246,100 @@ const ProjectAdvisor = () => {
       timestamp: new Date(),
     }
     setMessages([defaultMessage])
+    setCurrentSessionId(null)
+    sessionIdRef.current = null // Reset ref as well
     localStorage.removeItem('projectAdvisorMessages')
+    localStorage.removeItem('projectAdvisorCurrentSessionId') // Clear session ID too
+  }
+
+  // Session Management Functions
+  const saveCurrentSession = (sessionName) => {
+    if (!sessionName.trim()) return false
+    
+    const sessionId = currentSessionId || `session_${Date.now()}`
+    const newSession = {
+      id: sessionId,
+      name: sessionName.trim(),
+      messages: messages,
+      createdAt: currentSessionId ? 
+        savedSessions.find(s => s.id === sessionId)?.createdAt || new Date().toISOString() :
+        new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messageCount: messages.length
+    }
+    
+    const updatedSessions = savedSessions.filter(s => s.id !== sessionId)
+    updatedSessions.unshift(newSession)
+    
+    // Keep only the last 20 sessions to prevent localStorage bloat
+    const limitedSessions = updatedSessions.slice(0, 20)
+    
+    setSavedSessions(limitedSessions)
+    setCurrentSessionId(sessionId)
+    localStorage.setItem('projectAdvisorSessions', JSON.stringify(limitedSessions))
+    return true
+  }
+  
+  const loadSession = (sessionId) => {
+    const session = savedSessions.find(s => s.id === sessionId)
+    if (!session) return false
+    
+    // Set loading flag to prevent auto-save during session load
+    setIsLoadingSession(true)
+    
+    // Convert timestamp strings back to Date objects
+    const messagesWithDates = session.messages.map(msg => ({
+      ...msg,
+      timestamp: new Date(msg.timestamp)
+    }))
+    
+    setMessages(messagesWithDates)
+    setCurrentSessionId(sessionId)
+    sessionIdRef.current = sessionId // Set ref to loaded session ID
+    localStorage.setItem('projectAdvisorMessages', JSON.stringify(session.messages))
+    localStorage.setItem('projectAdvisorCurrentSessionId', sessionId) // Save session ID
+    // Don't auto-close sidebar - let user control it manually
+    
+    // Clear loading flag after a short delay to ensure all state updates are complete
+    setTimeout(() => {
+      setIsLoadingSession(false)
+    }, 100)
+    
+    return true
+  }
+  
+  const deleteSession = (sessionId) => {
+    if (window.confirm('Are you sure you want to delete this conversation?')) {
+      const updatedSessions = savedSessions.filter(s => s.id !== sessionId)
+      // Sort by createdAt to maintain consistent order
+      const sortedSessions = updatedSessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      
+      setSavedSessions(sortedSessions)
+      localStorage.setItem('projectAdvisorSessions', JSON.stringify(sortedSessions))
+      
+      // If we're deleting the current session, clear it
+      if (sessionIdRef.current === sessionId) {
+        clearChatHistory()
+      }
+    }
+  }
+  
+  const clearAllHistory = () => {
+    if (window.confirm('Are you sure you want to delete ALL conversation history? This action cannot be undone.')) {
+      setSavedSessions([])
+      localStorage.removeItem('projectAdvisorSessions')
+      clearChatHistory()
+    }
+  }
+  
+
+  
+  const createNewSession = () => {
+    clearChatHistory()
+    setCurrentSessionId(null)
+    sessionIdRef.current = null // Reset ref for new session
+    setIsLoadingSession(false)
+    // Don't auto-close sidebar when creating new session
   }
 
   const scrollToBottom = () => {
@@ -115,15 +349,77 @@ const ProjectAdvisor = () => {
   // Function to fetch user projects for AI context
   const fetchUserProjects = async (userId) => {
     try {
+      console.log('🔍 Fetching projects for AI context...')
       const response = await fetch(`http://localhost:8000/api/user-projects/${userId}`)
       if (response.ok) {
         const data = await response.json()
         setUserProjects(data.projects || [])
-        console.log('Loaded projects for AI context:', data.projects?.length || 0)
+        console.log(`✅ Loaded ${data.projects?.length || 0} projects for AI context:`, data.projects)
+        
+        // Update the default AI message with project context
+        if (data.projects?.length > 0) {
+          updateDefaultMessage(data.projects)
+        }
+      } else {
+        console.error('❌ Failed to fetch projects:', response.status, response.statusText)
       }
     } catch (error) {
-      console.error('Failed to fetch user projects:', error)
+      console.error('❌ Failed to fetch user projects:', error)
     }
+  }
+
+  // Update default AI message with project context
+  const updateDefaultMessage = (projects) => {
+    const urgentProjects = projects.filter(p => {
+      try {
+        const deadline = new Date(p.deadline)
+        const now = new Date()
+        const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
+        return daysUntil <= 7 && daysUntil >= 0
+      } catch {
+        return false
+      }
+    }).length
+
+    const overdueProjects = projects.filter(p => {
+      try {
+        const deadline = new Date(p.deadline)
+        const now = new Date()
+        return deadline < now
+      } catch {
+        return false
+      }
+    }).length
+
+    let contextMessage = `Hello! I'm your AI Project Advisor powered by Meta Llama. I have access to your ${projects.length} current project${projects.length !== 1 ? 's' : ''} and can provide personalized advice based on your actual workload, deadlines, and project mix.`
+    
+    if (urgentProjects > 0 || overdueProjects > 0) {
+      contextMessage += ` 
+
+📊 Project Alert: `
+      if (overdueProjects > 0) {
+        contextMessage += `${overdueProjects} project(s) are overdue and need immediate attention! `
+      }
+      if (urgentProjects > 0) {
+        contextMessage += `${urgentProjects} project(s) have urgent deadlines (≤7 days). `
+      }
+      contextMessage += `I can help you prioritize and create action plans.`
+    }
+
+    contextMessage += `
+
+What would you like to discuss about your projects today?`
+
+    // Only update if this is the initial default message
+    setMessages(prevMessages => {
+      if (prevMessages.length === 1 && prevMessages[0].id === 1) {
+        return [{
+          ...prevMessages[0],
+          content: contextMessage
+        }]
+      }
+      return prevMessages
+    })
   }
 
   // Typewriter effect function
@@ -293,6 +589,16 @@ const ProjectAdvisor = () => {
     "Tips for managing project scope creep?",
     "How to handle difficult project deadlines?",
     "Best practices for freelance project management?",
+    // Add context-aware questions based on user projects
+    ...(userProjects.length > 0 ? [
+      "Review my current project workload and priorities",
+      "Which of my projects needs immediate attention?",
+      "How should I handle my overdue projects?",
+      "Help me plan my schedule for the next week"
+    ] : [
+      "How do I get started with freelance project management?",
+      "What tools should I use for project tracking?"
+    ])
   ]
 
   const handleQuickQuestion = async (question) => {
@@ -400,162 +706,249 @@ const ProjectAdvisor = () => {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto" style={styles.container}>
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={styles.headerContent}>
-            <div style={styles.headerInfo}>
-              <h1 style={styles.title}>
-                <AIIcon />
-                AI Project Advisor
-              </h1>
-              <p style={styles.subtitle}>
-                Get intelligent advice for your freelance project management challenges
-                {userProjects.length > 0 && (
-                  <span style={styles.projectContext}>
-                    • AI has access to {userProjects.length} project{userProjects.length !== 1 ? 's' : ''} for personalized advice
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Container */}
-        <div style={styles.chatContainer}>
-          {/* Messages */}
-          <div style={styles.messagesContainer}>
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                style={{
-                  ...styles.messageWrapper,
-                  justifyContent: message.type === "user" ? "flex-end" : "flex-start",
-                }}
-                className={animatingMessages.has(message.id) ? "message-slide-up" : ""}
-              >
-                <div style={styles.messageGroup}>
-                  {message.type === "ai" && (
-                    <div style={styles.aiAvatar}>
-                      <AIIcon />
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      ...styles.messageBubble,
-                      ...(message.type === "user" ? styles.userMessage : styles.aiMessage),
-                    }}
+      <div className="max-w-full mx-auto" style={styles.container}>
+        
+        {/* ChatGPT-style Layout: Sidebar + Main Chat */}
+        <div style={styles.chatGPTLayout}>
+          
+          {/* Left Sidebar - History */}
+          {showHistoryPanel && (
+            <div style={styles.sidebar}>
+              <div style={styles.sidebarHeader}>
+                <button
+                  onClick={createNewSession}
+                  style={styles.newChatButton}
+                  className="newChatButton"
+                  title="Start new conversation"
+                >
+                  <Plus size={16} />
+                  <span>New Chat</span>
+                </button>
+                
+                {savedSessions.length > 0 && (
+                  <button
+                    onClick={clearAllHistory}
+                    style={styles.clearAllButton}
+                    className="clearAllButton"
+                    title="Delete all conversations"
                   >
-                    <p style={styles.messageContent}>
-                      {message.content}
-                    </p>
-                    <span style={styles.messageTime}>
-                      {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  {message.type === "user" && (
-                    <div style={styles.userAvatar}>
-                      <UserIcon />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Simple Loading Indicator - only show when waiting for AI response, not during reveal */}
-            {isTyping && !isRevealing && (
-              <div style={styles.simpleLoadingContainer}>
-                <div style={styles.typingIndicator}>
-                  <div style={styles.typingDot} className="typing-dot"></div>
-                  <div style={styles.typingDot} className="typing-dot"></div>
-                  <div style={styles.typingDot} className="typing-dot"></div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Quick Questions */}
-          {messages.length <= 1 && (
-            <div style={styles.quickQuestionsContainer}>
-              <h3 style={styles.quickQuestionsTitle}>Quick Questions</h3>
-              <div style={styles.quickQuestionsList}>
-                {quickQuestions.map((question, index) => (
-                  <button 
-                    key={index} 
-                    onClick={() => handleQuickQuestion(question)} 
-                    style={styles.quickQuestionButton} 
-                    className="quickQuestionButton"
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#F3F4F6'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#F9FAFB'
-                    }}
-                  >
-                    {question}
+                    <Trash2 size={16} />
+                    <span>Clear All History</span>
                   </button>
-                ))}
+                )}
+              </div>
+              
+              <div style={styles.sidebarContent} className="sidebarContent">
+                {savedSessions.length === 0 ? (
+                  <div style={styles.emptySidebar}>
+                    <p style={styles.emptySidebarText}>No conversations yet</p>
+                  </div>
+                ) : (
+                  <div style={styles.conversationsList}>
+                    {savedSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        style={{
+                          ...styles.conversationItem,
+                          ...(currentSessionId === session.id ? styles.activeConversationItem : {})
+                        }}
+                        onClick={() => loadSession(session.id)}
+                        className="conversationItem"
+                      >
+                        <div style={styles.conversationInfo}>
+                          <h3 style={styles.conversationName}>{session.name}</h3>
+                          <div style={styles.conversationMeta}>
+                            <span style={styles.conversationDate}>
+                              {new Date(session.updatedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteSession(session.id)
+                          }}
+                          style={styles.deleteConversationButton}
+                          title="Delete conversation"
+                          className="deleteConversationButton"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
-
-          {/* Input Area */}
-          <div style={styles.inputContainer}>
-            <div style={styles.inputWrapper}>
-              <button 
-                onClick={clearChatHistory} 
-                style={styles.clearButtonLeft}
-                className="clearButton"
-                title="Clear chat history"
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#2563EB'
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#3B82F6'
-                }}
-              >
-                <ClearIcon />
-              </button>
-              <textarea
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask me anything about project management..."
-                style={styles.messageInput}
-                rows={1}
-                disabled={false}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isTyping}
-                style={{
-                  ...styles.sendButton,
-                  ...(!inputMessage.trim() || isTyping ? styles.sendButtonDisabled : {}),
-                }}
-                onMouseEnter={(e) => {
-                  if (!(!inputMessage.trim() || isTyping)) {
-                    e.target.style.backgroundColor = '#2563EB'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!(!inputMessage.trim() || isTyping)) {
-                    e.target.style.backgroundColor = '#3B82F6'
-                  }
-                }}
-              >
-                <SendIcon />
-              </button>
+          
+          {/* Main Chat Area */}
+          <div style={styles.mainChatArea}>
+            {/* Header */}
+            <div style={styles.chatHeader}>
+              <div style={styles.chatHeaderContent}>
+                <div style={styles.chatHeaderTop}>
+                  <button
+                    onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+                    style={styles.toggleSidebarButton}
+                    className="toggleSidebarButton"
+                    title={showHistoryPanel ? "Hide history" : "Show history"}
+                  >
+                    <History size={20} />
+                  </button>
+                  <h1 style={styles.chatTitle}>
+                    <BotMessageSquare size={24} color="#3B82F6" />
+                    AI Project Advisor
+                  </h1>
+                </div>
+                <p style={styles.chatSubtitle}>
+                  Get intelligent advice for your freelance project management
+                  {userProjects.length > 0 ? (
+                    <span style={styles.projectContext}>
+                      • AI has real-time access to {userProjects.length} project{userProjects.length !== 1 ? 's' : ''} 
+                      {(() => {
+                        const now = new Date()
+                        const urgentCount = userProjects.filter(p => {
+                          try {
+                            const deadline = new Date(p.deadline)
+                            const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
+                            return daysUntil <= 7 && daysUntil >= 0
+                          } catch { return false }
+                        }).length
+                        
+                        const overdueCount = userProjects.filter(p => {
+                          try {
+                            const deadline = new Date(p.deadline)
+                            return deadline < now
+                          } catch { return false }
+                        }).length
+                        
+                        if (overdueCount > 0) {
+                          return ` • ${overdueCount} overdue ❌`
+                        } else if (urgentCount > 0) {
+                          return ` • ${urgentCount} urgent ⚠️`
+                        }
+                        return ' ✅'
+                      })()}
+                    </span>
+                  ) : (
+                    <span style={styles.noProjectsContext}>
+                      • AI ready to help plan your projects
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
-            <p style={styles.inputHint}>
-              {isTyping || isRevealing ? (
-                <>AI is responding... You can still type your next message. <strong>Chat history saved locally</strong></>
-              ) : (
-                <>Press Enter to send, Shift + Enter for new line, <strong>Chat history saved locally</strong></>
+
+            {/* Chat Container */}
+            <div style={styles.chatContainer}>
+              {/* Messages */}
+              <div style={styles.messagesContainer} className="messagesContainer">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    style={{
+                      ...styles.messageWrapper,
+                      justifyContent: message.type === "user" ? "flex-end" : "flex-start",
+                    }}
+                    className={animatingMessages.has(message.id) ? "message-slide-up" : ""}
+                  >
+                    <div style={styles.messageGroup}>
+                      {message.type === "ai" && (
+                        <div style={styles.aiAvatar}>
+                          <BotMessageSquare size={20} color="white" />
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          ...styles.messageBubble,
+                          ...(message.type === "user" ? styles.userMessage : styles.aiMessage),
+                        }}
+                      >
+                        <p style={styles.messageContent}>
+                          {message.content}
+                        </p>
+                        <span style={styles.messageTime}>
+                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      {message.type === "user" && (
+                        <div style={styles.userAvatar}>
+                          <UserIcon />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Simple Loading Indicator */}
+                {isTyping && !isRevealing && (
+                  <div style={styles.simpleLoadingContainer}>
+                    <div style={styles.typingIndicator}>
+                      <div style={styles.typingDot} className="typing-dot"></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
+                      <div style={styles.typingDot} className="typing-dot"></div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Quick Questions */}
+              {messages.length <= 1 && (
+                <div style={styles.quickQuestionsContainer}>
+                  <h3 style={styles.quickQuestionsTitle}>Quick Questions</h3>
+                  <div style={styles.quickQuestionsList}>
+                    {quickQuestions.map((question, index) => (
+                      <button 
+                        key={index} 
+                        onClick={() => handleQuickQuestion(question)} 
+                        style={styles.quickQuestionButton} 
+                        className="quickQuestionButton"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-            </p>
+
+              {/* Input Area */}
+              <div style={styles.inputContainer}>
+                <div style={styles.inputWrapper}>
+                  <textarea
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Ask me anything about project management..."
+                    style={styles.messageInput}
+                    rows={1}
+                    disabled={false}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!inputMessage.trim() || isTyping}
+                    style={{
+                      ...styles.sendButton,
+                      ...(!inputMessage.trim() || isTyping ? styles.sendButtonDisabled : {}),
+                    }}
+                    className="sendButton"
+                  >
+                    <SendIcon />
+                  </button>
+                </div>
+                <p style={styles.inputHint}>
+                  {isTyping || isRevealing ? (
+                    <>AI is responding... Conversations auto-saved</>
+                  ) : (
+                    <>Press Enter to send • Conversations auto-saved</>
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
+          
         </div>
       </div>
     </Layout>
@@ -563,17 +956,6 @@ const ProjectAdvisor = () => {
 }
 
 // Icon Components
-const AIIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
-    <path d="M8.5 8.5v.01" />
-    <path d="M16 15.5v.01" />
-    <path d="M12 12v.01" />
-    <path d="M11 17v.01" />
-    <path d="M7 14v.01" />
-  </svg>
-)
-
 const UserIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -600,74 +982,225 @@ const styles = {
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     display: "flex",
     flexDirection: "column",
+    height: "calc(100vh - 120px)",
+    minHeight: "500px",
+    maxHeight: "none",
   },
-  loadingContainer: {
+  chatGPTLayout: {
+    display: "flex",
+    flexDirection: "row",
+    height: "100%",
+    borderRadius: "0.5rem",
+    overflow: "hidden",
+    border: "1px solid #E2E8F0",
+    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+  },
+  
+  // Sidebar Styles
+  sidebar: {
+    width: "clamp(240px, 25vw, 320px)",
+    backgroundColor: "#F8FAFC",
+    borderRight: "1px solid #E2E8F0",
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.03), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+  },
+  sidebarHeader: {
+    padding: "1rem",
+    borderBottom: "1px solid #E2E8F0",
+  },
+  newChatButton: {
+    width: "100%",
+    padding: "0.75rem 1rem",
+    backgroundColor: "#3B82F6",
+    color: "white",
+    border: "none",
+    borderRadius: "0.5rem",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.5rem",
+    fontSize: "0.875rem",
+    fontWeight: "500",
+    transition: "all 0.2s",
+    boxShadow: "0 2px 4px rgba(59, 130, 246, 0.2)",
+    marginBottom: "0.5rem",
+  },
+
+  clearAllButton: {
+    width: "100%",
+    padding: "0.5rem 1rem",
+    backgroundColor: "#EF4444",
+    color: "white",
+    border: "none",
+    borderRadius: "0.5rem",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.5rem",
+    fontSize: "0.75rem",
+    fontWeight: "500",
+    transition: "all 0.2s",
+    boxShadow: "0 2px 4px rgba(239, 68, 68, 0.2)",
+  },
+  sidebarContent: {
+    flex: 1,
+    padding: "1rem",
+    overflowY: "auto",
+  },
+  emptySidebar: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: "50vh",
+    padding: "40px 20px",
+    textAlign: "center",
+    color: "#64748B",
   },
-  spinner: {
-    width: "40px",
-    height: "40px",
-    border: "4px solid #e5e7eb",
-    borderTop: "4px solid #3b82f6",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-    marginBottom: "16px",
+  emptySidebarText: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#64748B",
+    margin: 0,
   },
-  header: {
-    marginBottom: "24px",
-  },
-  headerContent: {
+  conversationsList: {
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "column",
+    gap: "8px",
   },
-  headerInfo: {
+  conversationItem: {
+    display: "flex",
+    alignItems: "center",
+    padding: "0.75rem 1rem",
+    borderRadius: "0.5rem",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    border: "1px solid transparent",
+    backgroundColor: "transparent",
+  },
+  activeConversationItem: {
+    backgroundColor: "#EBF5FF",
+    borderColor: "#3B82F6",
+  },
+  conversationInfo: {
     flex: 1,
+    minWidth: 0,
   },
-  title: {
-    fontSize: "32px",
-    fontWeight: "bold",
-    color: "#1f2937",
-    margin: "0 0 8px 0",
+  conversationName: {
+    fontSize: "0.875rem",
+    fontWeight: "500",
+    color: "#1E293B",
+    margin: "0 0 0.25rem 0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  conversationMeta: {
     display: "flex",
     alignItems: "center",
-    gap: "12px",
   },
-  subtitle: {
-    fontSize: "16px",
-    color: "#6b7280",
+  conversationDate: {
+    fontSize: "0.75rem",
+    color: "#64748B",
+  },
+  deleteConversationButton: {
+    padding: "0.25rem",
+    backgroundColor: "transparent",
+    border: "1px solid transparent",
+    borderRadius: "0.25rem",
+    cursor: "pointer",
+    color: "#64748B",
+    transition: "all 0.2s",
+    opacity: 1,
+    marginLeft: "0.5rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  
+  // Main Chat Area Styles
+  mainChatArea: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    backgroundColor: "white",
+  },
+  chatHeader: {
+    padding: "1rem 1.25rem",
+    borderBottom: "1px solid #E2E8F0",
+    backgroundColor: "white",
+  },
+  chatHeaderContent: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+  },
+  chatHeaderTop: {
+    display: "flex",
+    alignItems: "center",
+    gap: "1rem",
+    width: "100%",
+  },
+  toggleSidebarButton: {
+    padding: "0.5rem",
+    backgroundColor: "#F1F5F9",
+    border: "1px solid #E2E8F0",
+    borderRadius: "0.5rem",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.2s",
+    color: "#64748B",
+  },
+  chatTitle: {
+    fontSize: "1.5rem",
+    fontWeight: "600",
+    color: "#1E293B",
+    margin: "0",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+  },
+  chatSubtitle: {
+    fontSize: "0.875rem",
+    color: "#64748B",
     margin: 0,
   },
   projectContext: {
     display: "block",
-    fontSize: "14px",
+    fontSize: "0.75rem",
     color: "#10B981",
     fontWeight: "500",
-    marginTop: "4px",
+    marginTop: "0.25rem",
   },
+  noProjectsContext: {
+    display: "block",
+    fontSize: "0.75rem",
+    color: "#64748B",
+    fontWeight: "500",
+    marginTop: "0.25rem",
+  },
+  
+  // Chat Container
   chatContainer: {
-    backgroundColor: "transparent",
+    flex: 1,
     display: "flex",
     flexDirection: "column",
+    backgroundColor: "white",
     overflow: "hidden",
-    maxWidth: "900px", // Increased from 700px for better screen utilization
-    width: "100%", // Full width of parent
-    margin: "0 auto",
-    height: "calc(100vh - 240px)", // Responsive height based on viewport (reduced padding)
-    minHeight: "750px", // Increased minimum height
   },
   messagesContainer: {
     flex: 1,
-    padding: "24px",
+    padding: "1rem 1.25rem",
     overflowY: "auto",
     display: "flex",
     flexDirection: "column",
-    gap: "16px",
-    minHeight: 0, // Allow flex shrinking
+    gap: "0.75rem",
+    minHeight: 0,
   },
   messageWrapper: {
     display: "flex",
@@ -676,12 +1209,12 @@ const styles = {
   messageGroup: {
     display: "flex",
     alignItems: "flex-end",
-    gap: "12px",
-    maxWidth: "80%", // Increased from 70% for wider messages
+    gap: "0.75rem",
+    maxWidth: "80%",
   },
   aiAvatar: {
-    width: "32px",
-    height: "32px",
+    width: "2rem",
+    height: "2rem",
     borderRadius: "50%",
     backgroundColor: "#3B82F6",
     color: "white",
@@ -691,8 +1224,8 @@ const styles = {
     flexShrink: 0,
   },
   userAvatar: {
-    width: "32px",
-    height: "32px",
+    width: "2rem",
+    height: "2rem",
     borderRadius: "50%",
     backgroundColor: "#10B981",
     color: "white",
@@ -702,14 +1235,14 @@ const styles = {
     flexShrink: 0,
   },
   messageBubble: {
-    padding: "12px 16px",
-    borderRadius: "18px",
+    padding: "0.75rem 1rem",
+    borderRadius: "1.125rem",
     maxWidth: "100%",
     wordWrap: "break-word",
   },
   aiMessage: {
-    backgroundColor: "#F3F4F6",
-    color: "#1F2937",
+    backgroundColor: "#F1F5F9",
+    color: "#1E293B",
     borderBottomLeftRadius: "6px",
   },
   userMessage: {
@@ -718,116 +1251,114 @@ const styles = {
     borderBottomRightRadius: "6px",
   },
   messageContent: {
-    margin: "0 0 4px 0",
-    fontSize: "14px",
+    margin: "0 0 0.25rem 0",
+    fontSize: "0.875rem",
     lineHeight: "1.5",
   },
   messageTime: {
-    fontSize: "12px",
+    fontSize: "0.75rem",
     opacity: 0.7,
+  },
+  
+  // Loading Indicator
+  simpleLoadingContainer: {
+    display: "flex",
+    justifyContent: "flex-start",
+    marginLeft: "2.75rem",
+    padding: "0.75rem 0",
   },
   typingIndicator: {
     display: "flex",
     gap: "4px",
-    padding: "4px 0",
+    padding: "8px 12px",
+    backgroundColor: "#F1F5F9",
+    borderRadius: "12px",
   },
   typingDot: {
     width: "8px",
     height: "8px",
-    backgroundColor: "#6B7280",
+    backgroundColor: "#64748B",
     borderRadius: "50%",
   },
-  simpleLoadingContainer: {
-    display: "flex",
-    justifyContent: "flex-start",
-    marginLeft: "24px",
-    padding: "16px 24px",
-  },
+  
+  // Quick Questions
   quickQuestionsContainer: {
-    padding: "24px",
-    flexShrink: 0, // Prevent quick questions from shrinking
-    backgroundColor: "transparent", // Transparent background
+    padding: "1rem 1.25rem",
+    flexShrink: 0,
+    backgroundColor: "transparent",
   },
   quickQuestionsTitle: {
-    fontSize: "16px",
+    fontSize: "1rem",
     fontWeight: "600",
-    color: "#1F2937",
-    margin: "0 0 16px 0",
+    color: "#1E293B",
+    margin: "0 0 1rem 0",
   },
   quickQuestionsList: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", // Increased minimum width
-    gap: "16px", // Increased gap for better spacing
+    gridTemplateColumns: "repeat(auto-fit, minmax(17.5rem, 1fr))",
+    gap: "0.75rem",
   },
   quickQuestionButton: {
-    padding: "12px 16px",
-    backgroundColor: "#F9FAFB",
-    border: "1px solid #E5E7EB",
-    borderRadius: "12px",
-    fontSize: "14px",
-    color: "#374151",
+    padding: "0.75rem 1rem",
+    backgroundColor: "#F8FAFC",
+    border: "1px solid #E2E8F0",
+    borderRadius: "0.5rem",
+    fontSize: "0.875rem",
+    color: "#334155",
     cursor: "pointer",
     transition: "all 0.2s",
     textAlign: "left",
-    boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
   },
+  
+  // Input Area
   inputContainer: {
-    padding: "24px",
-    flexShrink: 0, // Prevent input area from shrinking
-    backgroundColor: "transparent", // Transparent background
+    padding: "1rem 1.25rem",
+    flexShrink: 0,
+    backgroundColor: "white",
+    borderTop: "1px solid #E2E8F0",
   },
   inputWrapper: {
     display: "flex",
-    gap: "12px",
+    gap: "0.75rem",
     alignItems: "flex-end",
+    maxWidth: "50rem",
+    margin: "0 auto",
   },
   messageInput: {
     flex: 1,
-    padding: "12px 16px",
+    padding: "0.75rem 1rem",
     border: "1px solid #D1D5DB",
-    borderRadius: "12px",
-    fontSize: "14px",
+    borderRadius: "0.5rem",
+    fontSize: "0.875rem",
     resize: "none",
     outline: "none",
     fontFamily: "inherit",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    minHeight: "2.75rem",
+    maxHeight: "7.5rem",
   },
   sendButton: {
-    padding: "12px",
+    padding: "0.75rem",
     backgroundColor: "#3B82F6",
     color: "white",
     border: "none",
-    borderRadius: "12px",
+    borderRadius: "0.5rem",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     transition: "all 0.2s",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    flexShrink: 0,
   },
   sendButtonDisabled: {
     backgroundColor: "#9CA3AF",
     cursor: "not-allowed",
   },
   inputHint: {
-    fontSize: "12px",
-    color: "#6B7280",
-    margin: "8px 0 0 0",
+    fontSize: "0.75rem",
+    color: "#64748B",
+    margin: "0.5rem 0 0 0",
     textAlign: "center",
-  },
-  clearButtonLeft: {
-    padding: "12px",
-    backgroundColor: "#3B82F6",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.2s",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-    flexShrink: 0,
   },
 }
 
@@ -838,11 +1369,6 @@ styleSheet.innerText = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
   }
 
   @keyframes typing {
@@ -873,16 +1399,6 @@ styleSheet.innerText = `
     animation-delay: 0.4s;
   }
 
-
-
-  .clearButton:hover {
-    background-color: #2563EB;
-  }
-
-  .quickQuestionButton:hover {
-    background-color: #F3F4F6;
-  }
-
   @keyframes slideUpFromBottom {
     0% {
       opacity: 0;
@@ -896,6 +1412,102 @@ styleSheet.innerText = `
 
   .message-slide-up {
     animation: slideUpFromBottom 0.4s ease-out;
+  }
+
+  /* ChatGPT-style hover effects */
+  .newChatButton:hover {
+    background-color: #2563EB;
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  }
+
+  .conversationItem:hover {
+    background-color: #F1F5F9;
+    border-color: #CBD5E1;
+  }
+
+  .conversationItem:hover .deleteConversationButton {
+    opacity: 1;
+  }
+
+  .conversationItem.active {
+    background-color: #EBF5FF;
+    border-color: #3B82F6;
+  }
+
+  .deleteConversationButton:hover {
+    background-color: #DC2626 !important;
+    color: white !important;
+    borderColor: #DC2626 !important;
+  }
+
+  .quickQuestionButton:hover {
+    background-color: #F1F5F9;
+    border-color: #CBD5E1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .sendButton:hover {
+    background-color: #2563EB;
+  }
+
+  .toggleSidebarButton:hover {
+    background-color: #E2E8F0;
+    color: #1E293B;
+  }
+
+  .messageInput:focus {
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  /* Scrollbar styling for sidebar */
+  .sidebarContent::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sidebarContent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sidebarContent::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 3px;
+  }
+
+  .sidebarContent::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+  }
+
+  /* Scrollbar styling for messages */
+  .messagesContainer::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .messagesContainer::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .messagesContainer::-webkit-scrollbar-thumb {
+    background: #E2E8F0;
+    border-radius: 3px;
+  }
+
+  .messagesContainer::-webkit-scrollbar-thumb:hover {
+    background: #CBD5E1;
+  }
+
+  .clearButton:hover {
+    background-color: #475569;
+  }
+
+  .clearChatButton:hover {
+    background-color: #475569;
+  }
+
+  .clearAllButton:hover {
+    background-color: #DC2626;
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
   }
 `
 document.head.appendChild(styleSheet)

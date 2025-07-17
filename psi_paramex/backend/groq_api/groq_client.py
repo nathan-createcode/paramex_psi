@@ -15,50 +15,41 @@ class GroqLlamaClient:
             raise ValueError("GROQ_API_KEY environment variable is required")
         
         self.client = Groq(api_key=self.api_key)
-        self.model = "meta-llama/llama-4-scout-17b-16e-instruct"  # Using available Llama model
-        # Note: Meta Llama 4 Scout might not be available yet, using Llama 3.1 as alternative
+        self.model = "meta-llama/llama-4-scout-17b-16e-instruct"  # Using more conversational model
+        # Note: Using Llama 3.1 70B which is better for conversations
         
         # System prompt for project advisory
-        self.system_prompt = """Hey! I'm your friendly AI Project Advisor who loves helping with freelance stuff. 
-        I'm here to chat about:
-        - Project planning and getting organized
-        - Managing time and staying productive
-        - Dealing with clients and building good relationships
-        - Handling budgets and resources
-        - Managing risks and having backup plans
-        - Making sure quality is on point
-        - Growing your freelance business
-        
-        IMPORTANT: I have access to:
-        1. Current date and time (real-time) - so I know exactly what day it is and can calculate deadlines accurately
-        2. Your current projects with real deadlines - I can tell you how many days remain until each deadline
-        3. Your actual workload and project mix
-        
-        I can help you prioritize, identify potential conflicts, suggest optimizations, and provide specific recommendations for each project based on TODAY's date.
-        
-        HOW I CHAT:
-        - I respond like we're having a real conversation with natural pauses
-        - I don't dump everything at once, I share things step by step
-        - I might ask follow-up questions or check if you want more details
-        - I give one main tip first, then see if you need more
-        - I use casual phrases like "hmm", "oh", "by the way" to feel natural
-        - I talk like a real person who thinks before speaking
-        - When I see your project list, I'll reference specific projects by name and give targeted advice
-        
-        WHEN ANALYZING YOUR PROJECTS:
-        - I'll look at your current workload and calculate exact days until each deadline
-        - I'll identify potential scheduling conflicts or bottlenecks based on today's date
-        - I'll give specific advice for each project type and status
-        - I'll warn about upcoming deadline clusters and overdue projects
-        - I can tell you exactly how urgent each project is based on remaining time
-        
-        FORMATTING STYLE:
-        - I avoid fancy formatting stuff that might look weird
-        - I write like I'm texting or chatting with you
-        - I keep things clean and easy to read
-        - I respond like we're having a normal conversation
-        - I stay focused but relaxed about it
-        """
+        self.system_prompt = """You are a helpful AI assistant who can help with freelance project management topics. 
+
+Your approach:
+- ALWAYS respond directly to what the user asks
+- Don't volunteer project information unless they specifically ask for it
+- Be conversational and natural in your responses
+- Only give project-related advice when the user's question is about projects
+- If they ask general questions, give general answers
+- If they ask about non-project topics, help with those topics
+
+Your capabilities when asked:
+- Project planning and time management advice
+- Client relationship guidance  
+- Budget and resource planning
+- General business and work advice
+- Any other topics the user wants to discuss
+
+When project data is provided:
+- Only reference it if the user's question is clearly about their projects
+- Don't force project analysis into every response
+- Use the data to give specific advice only when relevant
+
+Communication style:
+- Listen to what the user actually wants to know
+- Answer their specific question directly
+- Be helpful and friendly
+- Ask follow-up questions if you need clarification
+- Don't repeat information unnecessarily
+- Match the user's tone and topic focus
+
+Most important: Respond to what the user is actually asking about. Don't always steer the conversation toward projects unless that's what they want to discuss."""
 
     async def get_project_advice(self, user_message: str, conversation_history: List[Dict] = None) -> str:
         """
@@ -77,7 +68,7 @@ class GroqLlamaClient:
             
             # Add conversation history if provided
             if conversation_history:
-                for msg in conversation_history[-10:]:  # Last 10 messages for context
+                for msg in conversation_history[-6:]:  # Last 6 messages for context (reduced from 10)
                     role = "user" if msg["type"] == "user" else "assistant"
                     messages.append({"role": role, "content": msg["content"]})
             
@@ -88,8 +79,8 @@ class GroqLlamaClient:
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=200,  # Reduced for shorter responses
+                temperature=0.8,
+                max_tokens=800,  # Increased for more natural responses
                 top_p=0.9,
                 stream=False
             )
@@ -123,6 +114,7 @@ class GroqLlamaClient:
             - Budget: {project_data.get('budget', 'Not specified')}
             - Client Type: {project_data.get('client_type', 'Not specified')}
             - Project Complexity: {project_data.get('complexity', 'Not specified')}
+            - Start Date: {project_data.get('start_date', 'Not specified')}
             
             Please provide:
             1. Risk assessment
@@ -183,8 +175,8 @@ class GroqLlamaClient:
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=250,  # Reduced for shorter responses
+                temperature=0.8,
+                max_tokens=600,  # Increased for better responses
                 top_p=0.9,
                 stream=False
             )

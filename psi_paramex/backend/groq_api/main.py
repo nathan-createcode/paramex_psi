@@ -6,6 +6,8 @@ import uvicorn
 from groq_client import groq_client
 from scoring_logic import project_scorer
 from ux_safety_check import ux_safety_checker
+from supabase_email_service import SupabaseEmailService, EmailData
+from notification_scheduler import NotificationScheduler
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -22,11 +24,21 @@ app = FastAPI(title="ParameX PSI - AI Project Advisor API", version="1.0.0")
 supabase_url = os.getenv("VITE_SUPABASE_URL")
 supabase_key = os.getenv("VITE_SUPABASE_ANON_KEY")
 supabase: Client = None
+notification_scheduler = None
+email_service = None
 
 try:
     if supabase_url and supabase_key:
         supabase = create_client(supabase_url, supabase_key)
         print("✅ Supabase client initialized successfully")
+        
+        # Initialize email service
+        email_service = SupabaseEmailService(supabase)
+        print("✅ Email service initialized successfully")
+        
+        # Initialize notification scheduler
+        notification_scheduler = NotificationScheduler(supabase, email_service)
+        print("✅ Notification scheduler initialized successfully")
 except Exception as e:
     print(f"⚠️ Warning: Could not initialize Supabase client: {e}")
     print("Project context features will be disabled")
@@ -65,6 +77,21 @@ class ProjectAnalysisRequest(BaseModel):
 
 class QuickAdviceRequest(BaseModel):
     question_type: str
+
+# Email-related models
+class EmailTestRequest(BaseModel):
+    user_email: str
+    user_name: Optional[str] = "User"
+
+class ProjectUpdateRequest(BaseModel):
+    project_id: str
+    old_status: str
+    new_status: str
+    update_message: Optional[str] = ""
+
+class WelcomeEmailRequest(BaseModel):
+    user_email: str
+    user_name: Optional[str] = "New User"
 
 # Health check endpoint
 @app.get("/")
@@ -147,27 +174,75 @@ async def chat_with_advisor(request: ChatRequest):
         
         # Get user projects for context if user_id is provided
         project_context = ""
+        project_summary = ""
         if request.user_id and supabase:
             try:
+                print(f"🔍 Getting projects for user: {request.user_id}")
+                print(f"🔗 Supabase connection status: {supabase is not None}")
+                
                 projects_response = await get_user_projects(request.user_id)
-                if projects_response["projects"]:
-                    project_context = "\n\nYour Current Projects:\n"
+                print(f"📈 Projects response: {projects_response}")
+                
+                if projects_response.get("projects") and len(projects_response["projects"]) > 0:
+                    print(f"📊 Found {len(projects_response['projects'])} projects for user")
+                    project_context = "Your Current Projects:\n"
+                    active_projects = 0
+                    overdue_projects = 0
+                    urgent_projects = 0
+                    
                     for project in projects_response["projects"]:
                         # Calculate days until deadline
                         try:
                             deadline_date = datetime.strptime(project['deadline'], '%Y-%m-%d')
                             days_until_deadline = (deadline_date - current_datetime.replace(tzinfo=None)).days
                             deadline_info = f"Deadline: {project['deadline']}"
+                            
                             if days_until_deadline >= 0:
                                 deadline_info += f" ({days_until_deadline} days remaining)"
+                                if days_until_deadline <= 7:
+                                    urgent_projects += 1
+                                    deadline_info += " ⚠️ URGENT"
                             else:
-                                deadline_info += f" ({abs(days_until_deadline)} days overdue)"
-                        except:
+                                deadline_info += f" ({abs(days_until_deadline)} days overdue) ❌ OVERDUE"
+                                overdue_projects += 1
+                            
+                            if project['status'].lower() not in ['completed', 'cancelled']:
+                                active_projects += 1
+                                
+                        except Exception as date_error:
+                            print(f"⚠️ Date parsing error for project {project.get('name', 'Unknown')}: {date_error}")
                             deadline_info = f"Deadline: {project['deadline']}"
                         
-                        project_context += f"- {project['name']} (Client: {project['client']}, Status: {project['status']}, Difficulty: {project['difficulty']}, Payment: ${project['payment']}, {deadline_info})\n"
+                        # Add start date info
+                        start_date_info = f"Start: {project['start_date']}" if project['start_date'] else "Start: Not specified"
+                        
+                        # Format project info with more detail
+                        project_context += f"- {project['name']} (Client: {project['client']}, Status: {project['status']}, Type: {project['type']}, Difficulty: {project['difficulty']}/5, Payment: ${project['payment']}, {start_date_info}, {deadline_info})\n"
+                    
+                    # Add project summary for AI
+                    project_summary = f"Project Summary: You have {len(projects_response['projects'])} total projects, {active_projects} active, {urgent_projects} urgent (deadline ≤7 days), {overdue_projects} overdue."
+                    
+                    if urgent_projects > 0:
+                        project_summary += f" ⚠️ You have {urgent_projects} urgent project(s) that need immediate attention!"
+                    if overdue_projects > 0:
+                        project_summary += f" ❌ You have {overdue_projects} overdue project(s) that need urgent action!"
+                        
+                else:
+                    print("📭 No projects found for user - response was empty or no projects")
+                    project_context = "You don't have any projects in the system yet. I can help you plan new projects or discuss general project management strategies."
+                    
             except Exception as e:
-                print(f"Failed to get project context: {e}")
+                print(f"❌ Failed to get project context - Full error: {str(e)}")
+                print(f"❌ Error type: {type(e).__name__}")
+                import traceback
+                print(f"❌ Full traceback: {traceback.format_exc()}")
+                project_context = "I'm having trouble accessing your project data right now, but I can still help with general project management advice."
+        elif not request.user_id:
+            print("⚠️ No user_id provided in request")
+            project_context = "No user ID provided - please make sure you're logged in to access your project data."
+        elif not supabase:
+            print("⚠️ No supabase connection available") 
+            project_context = "Database connection not available - project data cannot be accessed."
         
         # Convert conversation history to the format expected by groq_client
         history = []
@@ -178,9 +253,22 @@ async def chat_with_advisor(request: ChatRequest):
                     "content": msg.content
                 })
         
-        # Get AI response from Groq with project context and current date/time
+        # Enhanced message with better context
+        enhanced_message = f"{request.message}"
+        
+        # Always add current time context for AI awareness (but subtle)
+        enhanced_message += f"\n\n[Context: Current time is {current_datetime.strftime('%A, %B %d, %Y at %I:%M %p')} Jakarta time]"
+        
+        # Always include project context if available (AI will decide when to use it)
+        if project_context.strip() and request.user_id:
+            enhanced_message += f"\n\n[Project Database Access: {project_summary.strip()}]"
+            enhanced_message += f"\n[Your Projects: {project_context.strip()}]"
+        
+        print(f"🤖 Sending message to AI: {request.message[:100]}...")
+        
+        # Get AI response from Groq with enhanced project context
         ai_response = await groq_client.get_project_advice(
-            user_message=request.message + current_date_context + project_context,
+            user_message=enhanced_message,
             conversation_history=history
         )
         
@@ -189,9 +277,11 @@ async def chat_with_advisor(request: ChatRequest):
         if not response_safety['is_safe']:
             ai_response = "I apologize, but I need to provide a more appropriate response. Let me help you with your project management question in a different way. Could you please rephrase your question focusing on specific project challenges you're facing?"
         
+        print(f"✅ AI response generated successfully")
         return ChatResponse(response=ai_response)
         
     except Exception as e:
+        print(f"❌ Error in chat endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get AI response: {str(e)}")
 
 # Project analysis endpoint
@@ -266,6 +356,102 @@ async def get_quick_questions():
     }
     
     return {"questions": questions, "status": "success"}
+
+# Email endpoints
+@app.post("/api/email/test")
+async def send_test_email(request: EmailTestRequest):
+    """
+    Send a test email to verify email functionality
+    """
+    try:
+        if not email_service or not email_service.enabled:
+            raise HTTPException(status_code=503, detail="Email service not configured. Please check Supabase connection.")
+        
+        result = await email_service.send_test_email(
+            to_email=request.user_email,
+            user_name=request.user_name
+        )
+        
+        if result["success"]:
+            return {"message": "Test email sent successfully", "status": "success", "email_id": result.get("message_id")}
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to send test email: {result.get('error')}")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send test email: {str(e)}")
+
+@app.post("/api/email/project-update")
+async def send_project_update_email(request: ProjectUpdateRequest):
+    """
+    Send project status update email notification
+    """
+    try:
+        if not email_service or not email_service.enabled:
+            raise HTTPException(status_code=503, detail="Supabase email service not configured")
+        
+        if not notification_scheduler:
+            raise HTTPException(status_code=503, detail="Notification scheduler not available")
+        
+        result = await notification_scheduler.send_project_status_update(
+            project_id=request.project_id,
+            old_status=request.old_status,
+            new_status=request.new_status,
+            update_message=request.update_message
+        )
+        
+        if result["success"]:
+            return {"message": "Project update email sent successfully", "status": "success", "email_id": result.get("message_id")}
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to send project update email: {result.get('error')}")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send project update email: {str(e)}")
+
+@app.post("/api/email/welcome")
+async def send_welcome_email(request: WelcomeEmailRequest):
+    """
+    Send welcome email to new users
+    """
+    try:
+        if not email_service or not email_service.enabled:
+            raise HTTPException(status_code=503, detail="Supabase email service not configured")
+        
+        if not notification_scheduler:
+            raise HTTPException(status_code=503, detail="Notification scheduler not available")
+        
+        result = await notification_scheduler.send_welcome_email_to_user(
+            user_id="",  # User ID not required for welcome email
+            user_email=request.user_email,
+            user_name=request.user_name
+        )
+        
+        if result["success"]:
+            return {"message": "Welcome email sent successfully", "status": "success", "email_id": result.get("message_id")}
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to send welcome email: {result.get('error')}")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send welcome email: {str(e)}")
+
+@app.get("/api/email/status")
+async def get_email_service_status():
+    """
+    Get email service status and configuration
+    """
+    try:
+        status = {
+            "email_service_enabled": email_service.enabled if email_service else False,
+            "email_service_type": "Supabase Integration",
+            "notification_scheduler_available": notification_scheduler is not None,
+            "supabase_connected": supabase is not None,
+            "from_email": email_service.from_email if email_service and email_service.enabled else "Not configured",
+            "app_url": email_service.app_url if email_service and email_service.enabled else "Not configured"
+        }
+        
+        return {"status": status, "message": "Supabase email service status retrieved successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get email service status: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(

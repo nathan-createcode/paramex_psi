@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
+import { useSettings } from "../contexts/SettingsContext"
 import Layout from "../components/Layout"
 import {
   Chart as ChartJS,
@@ -103,7 +104,7 @@ const chartOptions = {
 }
 
 // Specific options for Project Types Chart (with enhanced tooltip)
-const typesChartOptions = {
+const createTypesChartOptions = (t) => ({
   ...chartOptions,
   animation: {
     easing: 'easeInOutQuart', // Smoother easing
@@ -120,10 +121,13 @@ const typesChartOptions = {
       ...chartOptions.plugins.tooltip,
       callbacks: {
         label: (context) => {
-          return `${context.label}: ${context.parsed.y} projects`;
+          const projectsText = t('language') === 'id' ? 'proyek' : 'projects'
+          return `${context.label}: ${context.parsed.y} ${projectsText}`;
         },
         afterBody: () => {
-          return 'Filtered View: Shows only projects in selected time period';
+          return t('language') === 'id' ? 
+            'Tampilan Terfilter: Hanya menampilkan proyek dalam periode waktu yang dipilih' :
+            'Filtered View: Shows only projects in selected time period';
         },
       },
     },
@@ -139,18 +143,27 @@ const typesChartOptions = {
       },
     },
   },
-}
+})
 
 // Specific options for Earnings Chart (without legend)
-const earningsChartOptions = {
+const createEarningsChartOptions = (formatCurrency) => ({
   ...chartOptions,
   plugins: {
     ...chartOptions.plugins,
     legend: {
       display: false, // Hide legend for earnings chart
     },
+    tooltip: {
+      ...chartOptions.plugins.tooltip,
+      callbacks: {
+        label: (context) => {
+          const value = context.parsed.y
+          return `Earnings: ${formatCurrency(value, true)}`
+        },
+      },
+    },
   },
-}
+})
 
 // Icon Components dengan warna
 const BarChart3Icon = ({ color = "#3B82F6" }) => (
@@ -217,6 +230,7 @@ const Dashboard = () => {
   const [error, setError] = useState(null)
   const [timeFilter, setTimeFilter] = useState("all")
   const navigate = useNavigate()
+  const { formatCurrency: globalFormatCurrency, t } = useSettings()
 
   // Authentication check
   useEffect(() => {
@@ -289,17 +303,6 @@ const Dashboard = () => {
     }
   }
 
-  // Format currency function for compact display
-  const formatCurrency = (amount) => {
-    if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`
-    } else if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(1)}K`
-    } else {
-      return `$${amount.toLocaleString()}`
-    }
-  }
-
   // Calculate summary data
   const summary = useMemo(() => {
     console.log("Calculating summary with projects:", projects.length)
@@ -315,7 +318,10 @@ const Dashboard = () => {
     console.log("Done projects:", doneProjects)
     console.log("Done projects payment amounts:", doneProjects.map(p => p.payment_amount))
     
-    const totalEarnings = doneProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0)
+    const totalEarnings = doneProjects.reduce((sum, p) => {
+      const payment = Number(p.payment_amount) || 0
+      return sum + payment
+    }, 0)
     console.log("Total earnings:", totalEarnings)
 
     // Calculate this month's earnings
@@ -329,7 +335,10 @@ const Dashboard = () => {
           projectDate.getFullYear() === thisMonth.getFullYear()
         )
       })
-      .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
+      .reduce((sum, p) => {
+        const payment = Number(p.payment_amount) || 0
+        return sum + payment
+      }, 0)
 
     console.log("Monthly earnings:", monthlyEarnings)
 
@@ -551,7 +560,10 @@ const Dashboard = () => {
 
       return {
         month,
-        earnings: completedProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0),
+        earnings: completedProjects.reduce((sum, p) => {
+          const payment = Number(p.payment_amount) || 0
+          return sum + payment
+        }, 0),
       }
     })
 
@@ -559,7 +571,7 @@ const Dashboard = () => {
       labels: monthlyEarningsData.map((d) => d.month),
       datasets: [
         {
-          label: "Earnings ($)",
+          label: "Earnings",
           data: monthlyEarningsData.map((d) => d.earnings),
           borderColor: "#10B981",
           backgroundColor: "rgba(16, 185, 129, 0.1)",
@@ -607,19 +619,19 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto">
         {/* Dynamic Welcome Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('dashboard')} Overview</h1>
           <p className="text-lg text-gray-600 leading-relaxed">
-            Welcome back, {user?.user_metadata?.full_name || user?.email}! You have{" "}
+            {t('welcomeBack')}, {user?.user_metadata?.full_name || user?.email}! You have{" "}
             <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg" >
-              {summary.totalProjects} projects
+              {summary.totalProjects} {t('projects').toLowerCase()}
             </span>
             ,{" "}
             <span className="font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
-              {summary.onProcess} in progress
+              {summary.onProcess} {t('inProgress').toLowerCase()}
             </span>
             , and earned{" "}
             <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-              ${summary.monthlyEarnings.toLocaleString()} this month
+              {globalFormatCurrency(summary.monthlyEarnings, true)} {t('thisMonth').toLowerCase()}
             </span>
             .
           </p>
@@ -629,28 +641,28 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
           {[
             {
-              title: "Total Projects",
+              title: t('totalProjects'),
               value: summary.totalProjects.toString(),
               icon: BarChart3Icon,
               iconColor: "#3B82F6",
               bgColor: "bg-blue-50",
             },
             {
-              title: "On-Plan",
+              title: t('planning'),
               value: summary.onPlan.toString(),
               icon: ClockIcon,
               iconColor: "#3B82F6",
               bgColor: "bg-blue-50",
             },
             {
-              title: "On-Process",
+              title: t('inProgress'),
               value: summary.onProcess.toString(),
               icon: TrendingUpIcon,
               iconColor: "#EAB308",
               bgColor: "bg-yellow-50",
             },
             {
-              title: "Done",
+              title: t('completed'),
               value: summary.done.toString(),
               icon: CheckCircleIcon,
               iconColor: "#10B981",
@@ -658,8 +670,8 @@ const Dashboard = () => {
             },
             {
               title: "Total Earnings",
-              value: formatCurrency(summary.totalEarnings),
-              fullValue: `$${summary.totalEarnings.toLocaleString()}`,
+              value: globalFormatCurrency(summary.totalEarnings, true),
+              fullValue: globalFormatCurrency(summary.totalEarnings),
               icon: DollarSignIcon,
               iconColor: "#10B981",
               bgColor: "bg-green-50",
@@ -686,20 +698,20 @@ const Dashboard = () => {
           <div className="flex flex-row gap-4 items-center justify-between mb-6 flex-wrap">
             <div className="flex items-center gap-2">
               <FilterIcon />
-              <h2 className="text-xl font-bold text-gray-900">Filtered Analytics</h2>
+              <h2 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Analitik Terfilter' : 'Filtered Analytics'}</h2>
             </div>
             <div className="relative">
               <Dropdown
                 value={timeFilter}
                 onChange={(value) => setTimeFilter(value)}
                 options={[
-                  { value: "all", label: "All Time" },
-                  { value: "0", label: "This Month" },
-                  { value: "1", label: "Last Month" },
-                  { value: "2", label: "2 Months Ago" },
-                  { value: "3", label: "3 Months Ago" }
+                  { value: "all", label: t('language') === 'id' ? "Semua Waktu" : "All Time" },
+                  { value: "0", label: t('thisMonth') },
+                  { value: "1", label: t('language') === 'id' ? "Bulan Lalu" : "Last Month" },
+                  { value: "2", label: t('language') === 'id' ? "2 Bulan Lalu" : "2 Months Ago" },
+                  { value: "3", label: t('language') === 'id' ? "3 Bulan Lalu" : "3 Months Ago" }
                 ]}
-                placeholder="Select time period"
+                placeholder={t('language') === 'id' ? "Pilih periode waktu" : "Select time period"}
                 className="min-w-[180px]"
               />
             </div>
@@ -709,10 +721,10 @@ const Dashboard = () => {
             {/* Project Status Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Project Status</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('status')} {t('projects')}</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
                   <FilterIcon />
-                  <span>Filtered</span>
+                  <span>{t('language') === 'id' ? 'Terfilter' : 'Filtered'}</span>
                 </div>
               </div>
               <div className="h-64 relative">
@@ -723,19 +735,19 @@ const Dashboard = () => {
             {/* Project Types Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Project Types</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Tipe Proyek' : 'Project Types'}</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
                   <FilterIcon />
-                  <span>Filtered</span>
+                  <span>{t('language') === 'id' ? 'Terfilter' : 'Filtered'}</span>
                 </div>
               </div>
               <div className="h-64 relative">
                 {typesData.labels.length > 0 ? (
-                  <Bar data={typesData} options={typesChartOptions} />
+                  <Bar data={typesData} options={createTypesChartOptions(t)} />
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     <div className="text-4xl mb-2">📊</div>
-                    <p className="text-sm">No projects in selected time period</p>
+                    <p className="text-sm">{t('language') === 'id' ? 'Tidak ada proyek di periode waktu yang dipilih' : 'No projects in selected time period'}</p>
                   </div>
                 )}
               </div>
@@ -747,17 +759,17 @@ const Dashboard = () => {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-6">
             <GlobeIcon />
-            <h2 className="text-xl font-bold text-gray-900">Overall Performance</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Performa Keseluruhan' : 'Overall Performance'}</h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Trends Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Project Trends</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Tren Proyek' : 'Project Trends'}</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
                   <GlobeIcon />
-                  <span>Global View</span>
+                  <span>{t('language') === 'id' ? 'Tampilan Global' : 'Global View'}</span>
                 </div>
               </div>
               <div className="h-64 relative">
@@ -768,14 +780,14 @@ const Dashboard = () => {
             {/* Earnings Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Monthly Earnings</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Pendapatan Bulanan' : 'Monthly Earnings'}</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
                   <GlobeIcon />
-                  <span>Global View</span>
+                  <span>{t('language') === 'id' ? 'Tampilan Global' : 'Global View'}</span>
                 </div>
               </div>
               <div className="h-64 relative">
-                <Line data={earningsData} options={earningsChartOptions} />
+                <Line data={earningsData} options={createEarningsChartOptions(globalFormatCurrency)} />
               </div>
             </div>
           </div>
@@ -785,15 +797,15 @@ const Dashboard = () => {
         {projects.length === 0 && (
           <div className="text-center py-15 px-5 bg-white rounded-3xl shadow-md/5 border border-gray-100 mt-8">
             <div className="text-6xl mb-4">📊</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Projects Yet</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{t('language') === 'id' ? 'Belum Ada Proyek' : 'No Projects Yet'}</h3>
             <p className="text-base text-gray-600 mb-6">
-              Start by adding your first project to see analytics and insights here.
+              {t('language') === 'id' ? 'Mulai dengan menambahkan proyek pertama Anda untuk melihat analitik dan wawasan di sini.' : 'Start by adding your first project to see analytics and insights here.'}
             </p>
             <button
               className="px-6 py-3 bg-blue-500 text-white border-none rounded-xl cursor-pointer text-base font-medium transition-all duration-200"
               onClick={() => navigate("/projects")}
             >
-              Add Your First Project
+              {t('language') === 'id' ? 'Tambahkan Proyek Pertama Anda' : 'Add Your First Project'}
             </button>
           </div>
         )}

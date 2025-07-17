@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/supabase";
+import { useSettings } from "../contexts/SettingsContext";
 import Layout from "../components/Layout";
 import ProjectTable from "../components/project-man-comp/project-table";
 import SearchAndFilters from "../components/project-man-comp/search-filter";
@@ -13,6 +14,7 @@ import { Trash2, Pencil } from "lucide-react";
 
 export default function ProjectManagementPage() {
   const navigate = useNavigate();
+  const { t, formatCurrency } = useSettings();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -187,7 +189,7 @@ export default function ProjectManagementPage() {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[70vh]">
           <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading projects...</p>
+          <p className="text-gray-600 text-lg">{t('loading')} {t('projects').toLowerCase()}...</p>
         </div>
       </Layout>
     );
@@ -198,14 +200,14 @@ export default function ProjectManagementPage() {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
           <h2 className="text-xl font-semibold text-red-600 mb-2">
-            Error Loading Projects
+            {t('error')} {t('loading')} {t('projects')}
           </h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
           >
-            Retry
+            {t('language') === 'id' ? 'Coba Lagi' : 'Retry'}
           </button>
         </div>
       </Layout>
@@ -217,10 +219,10 @@ export default function ProjectManagementPage() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Project Management
+            {t('language') === 'id' ? 'Manajemen Proyek' : 'Project Management'}
           </h1>
           <p className="text-gray-600">
-            Manage and track all your freelance projects
+            {t('language') === 'id' ? 'Kelola dan lacak semua proyek freelance Anda' : 'Manage and track all your freelance projects'}
           </p>
         </div>
 
@@ -262,7 +264,10 @@ export default function ProjectManagementPage() {
         />
 
         <div className="mt-6 text-sm text-gray-500">
-          Showing {filteredProjects.length} of {projects.length} projects
+          {t('language') === 'id' ? 
+            `Menampilkan ${filteredProjects.length} dari ${projects.length} proyek` :
+            `Showing ${filteredProjects.length} of ${projects.length} projects`
+          }
         </div>
       </div>
 

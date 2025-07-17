@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
+import { useSettings } from "../contexts/SettingsContext"
 import Layout from "../components/Layout"
 import { ChevronDown } from "lucide-react"
 import Dropdown from "../components/ui/dropdown"
@@ -10,21 +11,13 @@ import Dropdown from "../components/ui/dropdown"
 const Settings = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [settings, setSettings] = useState({
-    theme: "light",
-    emailNotifications: true,
-    pushNotifications: false,
-    aiSuggestions: true,
-    defaultView: "dashboard",
-    language: "en",
-    timezone: "UTC",
-    currency: "USD",
-  })
+  const [user, setUser] = useState(null)
+  const { settings, updateSettings, t, formatCurrency, formatDate, formatTime } = useSettings()
   const navigate = useNavigate()
 
-  // Authentication check
+  // Authentication check and load settings
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndLoadSettings = async () => {
       try {
         const {
           data: { session },
@@ -38,6 +31,7 @@ const Settings = () => {
           return
         }
 
+        setUser(session.user)
         setLoading(false)
       } catch (error) {
         console.error("Auth error:", error)
@@ -45,29 +39,200 @@ const Settings = () => {
       }
     }
 
-    checkAuth()
+    checkAuthAndLoadSettings()
   }, [navigate])
 
-  const handleSettingChange = (key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
+  // Request notification permission
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission()
+      return permission === 'granted'
+    }
+    return false
+  }
+
+  const handleSettingChange = async (key, value) => {
+    // Handle special cases
+    if (key === 'pushNotifications' && value) {
+      const permission = await requestNotificationPermission()
+      if (!permission) {
+        alert('Please enable notifications in your browser settings')
+        return
+      }
+    }
+
+    // Update settings using context
+    updateSettings({ [key]: value })
+
+    // Show notification for certain toggles
+    if (key === 'emailNotifications') {
+      if (value) {
+        showNotification('Email notifications enabled', 'You will receive project updates via email')
+        // Test email sending when enabled
+        await handleTestEmail()
+      } else {
+        showNotification('Email notifications disabled', 'You will no longer receive email updates')
+      }
+    }
+
+    if (key === 'aiSuggestions') {
+      if (value) {
+        showNotification('AI Suggestions enabled', 'AI will now provide project recommendations')
+      } else {
+        showNotification('AI Suggestions disabled', 'AI recommendations are turned off')
+      }
+    }
+  }
+
+  const handleTestEmail = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/email/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_email: user?.email,
+          user_name: user?.user_metadata?.full_name || user?.email || 'User'
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        showNotification('Test email sent!', 'Check your inbox for the test email confirmation')
+        alert('✅ Test email sent successfully! Check your inbox.')
+      } else {
+        console.error('Email test failed:', result)
+        alert(`❌ Email test failed: ${result.detail || 'Please check Supabase configuration'}`)
+      }
+    } catch (error) {
+      console.error('Email test error:', error)
+      alert('❌ Email test failed: Backend not available or Supabase not configured')
+    }
+  }
+
+  const showNotification = (title, body) => {
+    if (settings.pushNotifications && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' })
+    }
+  }
+
+  const handleExportData = async () => {
+    try {
+      // Get user data from Supabase
+      const { data: userData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        throw error
+      }
+
+      // Create export data
+      const exportData = {
+        user: {
+          id: user?.id,
+          email: user?.email,
+          created_at: user?.created_at
+        },
+        profile: userData,
+        settings: settings,
+        exportedAt: new Date().toISOString()
+      }
+
+      // Download as JSON
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `paramex-data-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      showNotification('Data exported', 'Your data has been downloaded successfully')
+    } catch (error) {
+      console.error('Export error:', error)
+      alert('Failed to export data. Please try again.')
+    }
+  }
+
+  const handleClearCache = () => {
+    if (confirm('Are you sure you want to clear the application cache? This will remove all locally stored data.')) {
+      // Clear localStorage except essential auth data
+      const keysToKeep = ['sb-' + supabase.supabaseUrl.split('//')[1] + '-auth-token']
+      const allKeys = Object.keys(localStorage)
+      
+      allKeys.forEach(key => {
+        if (!keysToKeep.some(keepKey => key.includes(keepKey))) {
+          localStorage.removeItem(key)
+        }
+      })
+
+      // Clear sessionStorage
+      sessionStorage.clear()
+
+      showNotification('Cache cleared', 'Application cache has been cleared successfully')
+      
+      // Reload page to reflect changes
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    const confirmation = prompt('This action cannot be undone. Type "DELETE" to confirm account deletion:')
+    
+    if (confirmation === 'DELETE') {
+      try {
+        // Delete user data from Supabase
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', user?.id)
+
+        if (profileError) console.warn('Profile deletion error:', profileError)
+
+        // Sign out user
+        await supabase.auth.signOut()
+        
+        // Clear all local data
+        localStorage.clear()
+        sessionStorage.clear()
+        
+        alert('Account deleted successfully. You will be redirected to the login page.')
+        navigate('/login')
+      } catch (error) {
+        console.error('Account deletion error:', error)
+        alert('Failed to delete account. Please contact support.')
+      }
+    } else if (confirmation !== null) {
+      alert('Account deletion cancelled. Please type "DELETE" exactly to confirm.')
+    }
   }
 
   const handleSaveSettings = async () => {
     setSaving(true)
 
-    // Simulate save delay
+    try {
+      // Settings are already saved automatically via context
+      // Simulate API save
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    // Here you would typically save to Supabase or your backend
     console.log("Settings saved:", settings)
-
+      showNotification(t('settingsSaved'), 'Your preferences have been updated')
+      alert(t('settingsSaved'))
+    } catch (error) {
+      console.error('Save error:', error)
+      alert('Failed to save settings. Please try again.')
+    } finally {
     setSaving(false)
-
-    // Show success message (you could add a toast notification here)
-    alert("Settings saved successfully!")
+    }
   }
 
   if (loading) {
@@ -75,7 +240,7 @@ const Settings = () => {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[70vh]">
           <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading settings...</p>
+          <p className="text-gray-600 text-lg">{t('loadingSettings')}</p>
         </div>
       </Layout>
     )
@@ -86,8 +251,8 @@ const Settings = () => {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">App Settings</h1>
-          <p className="text-lg text-gray-600 leading-relaxed">Manage your application preferences and configurations</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('appSettings')}</h1>
+          <p className="text-lg text-gray-600 leading-relaxed">{t('settingsDesc')}</p>
         </div>
 
         <div className="space-y-6">
@@ -96,14 +261,14 @@ const Settings = () => {
             <div className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <PaletteIcon />
-                Appearance & Theme
+                {t('appearanceTheme')}
               </h2>
             </div>
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Theme</label>
-                  <p className="text-sm text-gray-600">Choose your preferred color scheme</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('theme')}</label>
+                  <p className="text-sm text-gray-600">{t('themeDesc')}</p>
                 </div>
                 <Dropdown
                   value={settings.theme}
@@ -120,16 +285,16 @@ const Settings = () => {
 
               <div className="flex justify-between items-center">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Default View</label>
-                  <p className="text-sm text-gray-600">Choose which page to show when you log in</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('defaultView')}</label>
+                  <p className="text-sm text-gray-600">{t('defaultViewDesc')}</p>
                 </div>
                 <Dropdown
                   value={settings.defaultView}
                   onChange={(value) => handleSettingChange("defaultView", value)}
                   options={[
-                    { value: "dashboard", label: "Dashboard" },
-                    { value: "projects", label: "Projects" },
-                    { value: "dss", label: "DSS & AI" }
+                    { value: "dashboard", label: t('dashboard') },
+                    { value: "projects", label: t('projects') },
+                    { value: "dss", label: t('dss') }
                   ]}
                   placeholder="Select view"
                   className="min-w-[150px]"
@@ -143,20 +308,23 @@ const Settings = () => {
             <div className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <BellIcon />
-                Notifications
+                {t('notifications')}
               </h2>
             </div>
             <div className="space-y-6">
               <div className="flex justify-between items-center py-2">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Email Notifications</label>
-                  <p className="text-sm text-gray-600">Receive project updates via email</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('emailNotifications')}</label>
+                  <p className="text-sm text-gray-600">{t('emailNotificationsDesc')}</p>
                 </div>
-                <div className="relative cursor-pointer">
+                <div 
+                  className="relative cursor-pointer"
+                  onClick={() => handleSettingChange("emailNotifications", !settings.emailNotifications)}
+                >
                   <input
                     type="checkbox"
                     checked={settings.emailNotifications}
-                    onChange={(e) => handleSettingChange("emailNotifications", e.target.checked)}
+                    onChange={() => {}} // Handled by onClick above
                     className="absolute opacity-0 cursor-pointer"
                   />
                   <div
@@ -175,14 +343,17 @@ const Settings = () => {
 
               <div className="flex justify-between items-center py-2">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Push Notifications</label>
-                  <p className="text-sm text-gray-600">Receive notifications in the browser</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('pushNotifications')}</label>
+                  <p className="text-sm text-gray-600">{t('pushNotificationsDesc')}</p>
                 </div>
-                <div className="relative cursor-pointer">
+                <div 
+                  className="relative cursor-pointer"
+                  onClick={() => handleSettingChange("pushNotifications", !settings.pushNotifications)}
+                >
                   <input
                     type="checkbox"
                     checked={settings.pushNotifications}
-                    onChange={(e) => handleSettingChange("pushNotifications", e.target.checked)}
+                    onChange={() => {}} // Handled by onClick above
                     className="absolute opacity-0 cursor-pointer"
                   />
                   <div
@@ -201,14 +372,17 @@ const Settings = () => {
 
               <div className="flex justify-between items-center py-2">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">AI Suggestions</label>
-                  <p className="text-sm text-gray-600">Allow AI to provide project recommendations and insights</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('aiSuggestions')}</label>
+                  <p className="text-sm text-gray-600">{t('aiSuggestionsDesc')}</p>
                 </div>
-                <div className="relative cursor-pointer">
+                <div 
+                  className="relative cursor-pointer"
+                  onClick={() => handleSettingChange("aiSuggestions", !settings.aiSuggestions)}
+                >
                   <input
                     type="checkbox"
                     checked={settings.aiSuggestions}
-                    onChange={(e) => handleSettingChange("aiSuggestions", e.target.checked)}
+                    onChange={() => {}} // Handled by onClick above
                     className="absolute opacity-0 cursor-pointer"
                   />
                   <div
@@ -224,6 +398,21 @@ const Settings = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Test Email Button */}
+              <div className="flex justify-between items-center py-2 border-t border-gray-100 mt-4 pt-4">
+                <div className="flex-1">
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('testEmail')}</label>
+                  <p className="text-sm text-gray-600">{t('testEmailDesc')}</p>
+                </div>
+                <button 
+                  onClick={handleTestEmail}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors text-sm font-medium"
+                >
+                  <EmailIcon />
+                  {t('sendTest')}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -232,14 +421,14 @@ const Settings = () => {
             <div className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <GlobeIcon />
-                Regional Settings
+                {t('regionalSettings')}
               </h2>
             </div>
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Language</label>
-                  <p className="text-sm text-gray-600">Choose your preferred language</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('language')}</label>
+                  <p className="text-sm text-gray-600">{t('languageDesc')}</p>
                 </div>
                 <Dropdown
                   value={settings.language}
@@ -257,8 +446,8 @@ const Settings = () => {
 
               <div className="flex justify-between items-center">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Timezone</label>
-                  <p className="text-sm text-gray-600">Set your local timezone</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('timezone')}</label>
+                  <p className="text-sm text-gray-600">{t('timezoneDesc')}</p>
                 </div>
                 <Dropdown
                   value={settings.timezone}
@@ -276,8 +465,8 @@ const Settings = () => {
 
               <div className="flex justify-between items-center">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Currency</label>
-                  <p className="text-sm text-gray-600">Default currency for payments</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('currency')}</label>
+                  <p className="text-sm text-gray-600">{t('currencyDesc')}</p>
                 </div>
                 <Dropdown
                   value={settings.currency}
@@ -300,27 +489,33 @@ const Settings = () => {
             <div className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <ShieldIcon />
-                Data & Privacy
+                {t('dataPrivacy')}
               </h2>
             </div>
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Export Data</label>
-                  <p className="text-sm text-gray-600">Download your project data</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('exportData')}</label>
+                  <p className="text-sm text-gray-600">{t('exportDataDesc')}</p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-sm font-medium">
+                <button 
+                  onClick={handleExportData}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-sm font-medium"
+                >
                   <DownloadIcon />
-                  Export
+                  {t('export')}
                 </button>
               </div>
 
               <div className="flex justify-between items-center py-2">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Clear Cache</label>
-                  <p className="text-sm text-gray-600">Clear application cache</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('clearCache')}</label>
+                  <p className="text-sm text-gray-600">{t('clearCacheDesc')}</p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-sm font-medium">
+                <button 
+                  onClick={handleClearCache}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-sm font-medium"
+                >
                   <TrashIcon />
                   Clear
                 </button>
@@ -328,12 +523,15 @@ const Settings = () => {
 
               <div className="flex justify-between items-center py-2">
                 <div className="flex-1">
-                  <label className="text-base font-medium text-gray-900 block mb-1">Delete Account</label>
-                  <p className="text-sm text-gray-600">Permanently delete your account and all data</p>
+                  <label className="text-base font-medium text-gray-900 block mb-1">{t('deleteAccount')}</label>
+                  <p className="text-sm text-gray-600">{t('deleteAccountDesc')}</p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium">
+                <button 
+                  onClick={handleDeleteAccount}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium"
+                >
                   <TrashIcon />
-                  Delete
+                  {t('delete')}
                 </button>
               </div>
             </div>
@@ -353,12 +551,12 @@ const Settings = () => {
               {saving ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Saving...
+                  {t('saving')}
                 </>
               ) : (
                 <>
                   <SaveIcon />
-                  Save Settings
+                  {t('saveSettings')}
                 </>
               )}
             </button>
@@ -421,6 +619,13 @@ const SaveIcon = () => (
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
     <polyline points="17,21 17,13 7,13 7,21" />
     <polyline points="7,3 7,8 15,8" />
+  </svg>
+)
+
+const EmailIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
   </svg>
 )
 
