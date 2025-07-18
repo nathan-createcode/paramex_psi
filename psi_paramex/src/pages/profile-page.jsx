@@ -152,7 +152,7 @@ const ProfilePage = () => {
         <button
           onClick={async () => {
             await supabase.auth.signOut()
-            navigate("/login")
+            navigate("/")
           }}
           className="w-full mt-4 px-4 py-2 rounded-xl border border-gray-200 text-gray-800 shadow-[6px_6px_12px_#e8e8e8,_-6px_-6px_12px_#ffffff] hover:bg-gray-50 transition-colors"
         >

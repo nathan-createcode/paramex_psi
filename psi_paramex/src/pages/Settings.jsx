@@ -205,8 +205,8 @@ const Settings = () => {
         localStorage.clear()
         sessionStorage.clear()
         
-        alert('Account deleted successfully. You will be redirected to the login page.')
-        navigate('/login')
+        alert('Account deleted successfully. You will be redirected to the landing page.')
+        navigate('/')
       } catch (error) {
         console.error('Account deletion error:', error)
         alert('Failed to delete account. Please contact support.')

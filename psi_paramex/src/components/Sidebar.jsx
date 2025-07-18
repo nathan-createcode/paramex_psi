@@ -135,7 +135,7 @@ const Sidebar = () => {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
-      navigate("/login")
+      navigate("/")
     } catch (error) {
       console.error("Logout error:", error)
     }

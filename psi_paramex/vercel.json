@@ -1,0 +1,19 @@
+{
+  "builds": [
+    {
+      "src": "api/chat.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/chat.py"
+    }
+  ],
+  "functions": {
+    "api/chat.py": {
+      "maxDuration": 30
+    }
+  }
+} 
