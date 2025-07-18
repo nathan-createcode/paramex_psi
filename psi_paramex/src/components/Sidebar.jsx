@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   LogOut,
 } from "lucide-react"
+import logo from "../assets/logo.png"
 
 const Sidebar = () => {
   const navigate = useNavigate()
@@ -45,7 +46,6 @@ const Sidebar = () => {
       icon: LayoutDashboard,
     },
     {
-      name: t('projects'),
       name: "Projects Management",
       href: "/projects",
       icon: ClipboardCheck,
@@ -165,7 +165,7 @@ const Sidebar = () => {
               }}
             >
               <img
-                src="/src/assets/logo.png"
+                src={logo}
                 alt="logo"
                 width="32"
                 height="32"

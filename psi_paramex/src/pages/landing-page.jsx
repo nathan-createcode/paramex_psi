@@ -3,7 +3,8 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import FeatureCard from "../components/feature-card"
 import { GridIcon, ClockIcon, MapPinIcon } from "../components/icons"
-import gambarLandingPage from "../assets/landing_page_img.png";
+import gambarLandingPage from "../assets/landing_page_img.png"
+import logo from "../assets/logo.png";
 
 const LandingPage = () => {
   const [email, setEmail] = useState("")
@@ -60,7 +61,7 @@ const LandingPage = () => {
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm p-2">
             <img
-              src="/src/assets/logo.png"
+              src={logo}
               alt="logo"
               width="32"
               height="32"
@@ -156,7 +157,7 @@ const LandingPage = () => {
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm p-1.5">
                   <img
-                    src="/src/assets/logo.png"
+                    src={logo}
                     alt="logo"
                     width="28"
                     height="28"
