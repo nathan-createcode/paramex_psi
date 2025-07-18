@@ -7,6 +7,7 @@ import { useSettings } from "../contexts/SettingsContext"
 import Layout from "../components/Layout"
 import { ChevronDown } from "lucide-react"
 import Dropdown from "../components/ui/dropdown"
+import { API_ENDPOINTS, apiCall } from "../utils/api"
 
 const Settings = () => {
   const [loading, setLoading] = useState(true)
@@ -86,29 +87,19 @@ const Settings = () => {
 
   const handleTestEmail = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/email/test', {
+      const result = await apiCall(API_ENDPOINTS.emailTest, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           user_email: user?.email,
           user_name: user?.user_metadata?.full_name || user?.email || 'User'
         })
       })
 
-      const result = await response.json()
-
-      if (response.ok) {
-        showNotification('Test email sent!', 'Check your inbox for the test email confirmation')
-        alert('✅ Test email sent successfully! Check your inbox.')
-      } else {
-        console.error('Email test failed:', result)
-        alert(`❌ Email test failed: ${result.detail || 'Please check Supabase configuration'}`)
-      }
+      showNotification('Test email sent!', 'Check your inbox for the test email confirmation')
+      alert('✅ Test email sent successfully! Check your inbox.')
     } catch (error) {
       console.error('Email test error:', error)
-      alert('❌ Email test failed: Backend not available or Supabase not configured')
+      alert('❌ Email test failed: Please check your email service configuration')
     }
   }
 

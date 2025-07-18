@@ -15,6 +15,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { supabase } from "../supabase/supabase";
+import { API_ENDPOINTS, apiCall } from "../utils/api";
 
 export function ProjectForm({ onClose, onSubmit, loading, initialData = null, editMode = false }) {
   const [formData, setFormData] = useState({
@@ -176,30 +177,25 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
       const currentWorkload = projectData.ongoingProjects.length;
       
       // Call AI backend for intelligent decision making
-      const aiResponse = await fetch('http://localhost:8000/api/project-analysis', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: (await supabase.auth.getSession()).data.session?.user.id,
-          project_history: projectData,
-          completion_rate: completionRate,
-          current_workload: currentWorkload,
-          request_type: 'new_project_decision'
-        })
-      });
-
-      let aiDecision;
-      if (aiResponse.ok) {
-        const aiData = await aiResponse.json();
-        aiDecision = aiData.decision;
-      } else {
+      try {
+        const aiData = await apiCall(API_ENDPOINTS.projectAnalysis, {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: (await supabase.auth.getSession()).data.session?.user.id,
+            project_history: projectData,
+            completion_rate: completionRate,
+            current_workload: currentWorkload,
+            request_type: 'new_project_decision'
+          })
+        });
+        
+        setAiRecommendations(aiData.decision);
+      } catch (error) {
+        console.error("AI analysis failed, using local analysis:", error);
         // Fallback to local analysis if AI service is down
-        aiDecision = generateLocalAnalysis(projectData, completionRate, currentWorkload);
+        const aiDecision = generateLocalAnalysis(projectData, completionRate, currentWorkload);
+        setAiRecommendations(aiDecision);
       }
-
-      setAiRecommendations(aiDecision);
       
     } catch (error) {
       console.error("Error generating AI recommendations:", error);

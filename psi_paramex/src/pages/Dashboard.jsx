@@ -20,6 +20,7 @@ import {
 import { Line, Bar, Doughnut } from "react-chartjs-2"
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns"
 import { Brain, TrendingUp, AlertCircle, CheckCircle, Lightbulb } from "lucide-react"
+import { API_ENDPOINTS, apiCall } from "../utils/api"
 
 // Register Chart.js components including Filler
 ChartJS.register(
@@ -338,33 +339,30 @@ const Dashboard = () => {
         .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
 
       // Call AI backend for simple summary
-      const aiResponse = await fetch('http://localhost:8000/api/dashboard-summary', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          dashboard_data: {
-            totalProjects,
-            completedProjects,
-            ongoingProjects,
-            completionRate,
-            totalEarnings,
-            monthlyEarnings,
-            earningPotential,
-            mostCommonType: mostCommonType ? mostCommonType[0] : 'None'
-          }
+      try {
+        const aiData = await apiCall(API_ENDPOINTS.dashboardSummary, {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: userId,
+            dashboard_data: {
+              totalProjects,
+              completedProjects,
+              ongoingProjects,
+              completionRate,
+              totalEarnings,
+              monthlyEarnings,
+              earningPotential,
+              mostCommonType: mostCommonType ? mostCommonType[0] : 'None'
+            }
+          })
         })
-      })
-
-      if (aiResponse.ok) {
-        const aiData = await aiResponse.json()
+        
         setAiSummary({
           summary: aiData.summary,
           isSimple: true
         })
-      } else {
+      } catch (error) {
+        console.error("AI summary failed, using local summary:", error)
         // Fallback to local summary
         const localSummary = generateSimpleLocalSummary({
           totalProjects,

@@ -19,7 +19,7 @@ export const API_ENDPOINTS = {
   chat: `${API_BASE_URL}/chat`,
   health: `${API_BASE_URL}/health`,
   projectAnalysis: `${API_BASE_URL}/project-analysis`,
-  dashboardSummary: `${API_BASE_URL}/dashboard-summary`,
+  dashboardSummary: `${API_BASE_URL}/dashboard-summary`, 
   userProjects: (userId) => `${API_BASE_URL}/user-projects/${userId}`,
   emailTest: `${API_BASE_URL}/email/test`,
 }

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
 import { BotMessageSquare, Menu, Save, Trash2, Plus, FolderOpen } from "lucide-react"
+import { API_ENDPOINTS, apiCall } from "../utils/api"
 
 const ProjectAdvisor = () => {
   // Load messages from localStorage or use default
@@ -397,16 +398,11 @@ const ProjectAdvisor = () => {
   const fetchUserProjects = async (userId) => {
     try {
       console.log('🔍 Fetching projects for AI context...')
-      const response = await fetch(`http://localhost:8000/api/user-projects/${userId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setUserProjects(data.projects || [])
-        console.log(`✅ Loaded ${data.projects?.length || 0} projects for AI context:`, data.projects)
-        
-        // Projects loaded for AI context but no default message update needed
-      } else {
-        console.error('❌ Failed to fetch projects:', response.status, response.statusText)
-      }
+      const data = await apiCall(API_ENDPOINTS.userProjects(userId))
+      setUserProjects(data.projects || [])
+      console.log(`✅ Loaded ${data.projects?.length || 0} projects for AI context:`, data.projects)
+      
+      // Projects loaded for AI context but no default message update needed
     } catch (error) {
       console.error('❌ Failed to fetch user projects:', error)
     }
@@ -452,11 +448,8 @@ const ProjectAdvisor = () => {
   // Call Groq AI API for real AI responses
   const generateAIResponse = async (userMessage, conversationHistory) => {
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const data = await apiCall(API_ENDPOINTS.chat, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           message: userMessage,
           conversation_history: conversationHistory,
@@ -464,33 +457,19 @@ const ProjectAdvisor = () => {
         })
       })
 
-      if (!response.ok) {
-        let errorMessage = `HTTP error! status: ${response.status}`
-        try {
-          const errorData = await response.json()
-          if (errorData.error) {
-            errorMessage = errorData.error.message || errorData.error
-          }
-        } catch {
-          // If we can't parse the error response, use the status code
-        }
-        throw new Error(errorMessage)
-      }
-
-      const data = await response.json()
       return data.response
     } catch (error) {
       console.error('Error calling AI API:', error)
       
       // More specific error messages based on the error type
       if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        return "I'm having trouble connecting to the AI server. Please make sure the backend server is running on localhost:8000 and try again."
+        return "I'm having trouble connecting to the AI server. Please check your internet connection and try again."
       } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
-        return "The AI server is experiencing technical difficulties. This might be due to:\n\n• Groq API issues\n• Server configuration problems\n• Database connection issues\n\nPlease try again in a few moments. If the problem persists, check the backend server logs for more details."
+        return "The AI server is experiencing technical difficulties. This might be due to:\n\n• Groq API issues\n• Server configuration problems\n• Database connection issues\n\nPlease try again in a few moments."
       } else if (error.message.includes('404')) {
-        return "The AI chat endpoint is not available. Please make sure the backend server is running with the correct API endpoints."
+        return "The AI chat endpoint is not available. Please try again later."
       } else {
-        return `I apologize, but I'm experiencing technical difficulties. Error: ${error.message}\n\nPlease try again later or check if the backend server is running properly.`
+        return `I apologize, but I'm experiencing technical difficulties. Error: ${error.message}\n\nPlease try again later.`
       }
     }
   }
@@ -582,7 +561,7 @@ const ProjectAdvisor = () => {
       
       // Type out error message
       await typewriterEffect(
-        "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        "I apologize, but I'm experiencing technical difficulties. Please check your internet connection and try again.",
         errorResponseId
       )
     }
@@ -692,7 +671,7 @@ const ProjectAdvisor = () => {
       
       // Type out error message
       await typewriterEffect(
-        "I apologize, but I'm experiencing technical difficulties. Please ensure the backend server is running and try again.",
+        "I apologize, but I'm experiencing technical difficulties. Please check your internet connection and try again.",
         errorResponseId
       )
     }
