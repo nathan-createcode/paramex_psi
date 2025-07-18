@@ -453,6 +453,311 @@ async def get_email_service_status():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get email service status: {str(e)}")
 
+@app.post("/api/project-analysis")
+async def analyze_project_decision(request: dict):
+    """
+    Analyze user's project history and provide AI-powered decision on taking new projects
+    """
+    try:
+        user_id = request.get('user_id')
+        project_history = request.get('project_history', {})
+        completion_rate = request.get('completion_rate', 0)
+        current_workload = request.get('current_workload', 0)
+        
+        # Build context for AI analysis
+        context = f"""
+        You are an AI business advisor helping a freelancer decide whether to take on a new project.
+        
+        FREELANCER PROFILE:
+        - Total Projects: {project_history.get('totalProjects', 0)}
+        - Completed Projects: {len(project_history.get('completedProjects', []))}
+        - Current Active Projects: {current_workload}
+        - Completion Rate: {completion_rate:.1f}%
+        - Average Payment: ${project_history.get('averagePayment', 0):,.2f}
+        - Project Types: {', '.join(project_history.get('projectTypes', []))}
+        
+        ANALYSIS REQUESTED:
+        Provide a decision on whether this freelancer should take on a new project right now.
+        
+        Consider:
+        1. Current workload capacity (5+ projects = overloaded)
+        2. Completion rate (below 70% is concerning)
+        3. Project performance history
+        4. Financial stability and growth potential
+        5. Risk of overcommitment vs opportunity cost
+        
+        DECISION OPTIONS:
+        - "proceed" - Strong recommendation to take the project
+        - "caution" - Proceed but with careful consideration
+        - "defer" - Should not take the project now
+        
+        Provide:
+        1. Decision (proceed/caution/defer)
+        2. Confidence level (0-100%)
+        3. Clear reasoning
+        4. Timeline recommendation
+        5. 3-4 key insights
+        
+        Be decisive and practical. Focus on business success and client satisfaction.
+        Do not provide pricing suggestions.
+        """
+        
+        # Use Groq for intelligent analysis
+        try:
+            response = client.chat.completions.create(
+                model="mixtral-8x7b-32768",
+                messages=[
+                    {"role": "system", "content": "You are a senior business advisor with expertise in freelance project management and business development. Provide structured, actionable advice."},
+                    {"role": "user", "content": context}
+                ],
+                temperature=0.3,
+                max_tokens=1000
+            )
+            
+            ai_response = response.choices[0].message.content
+            
+            # Parse AI response to extract structured data
+            decision_data = parse_ai_decision(ai_response, project_history, completion_rate, current_workload)
+            
+            return {
+                "success": True,
+                "decision": decision_data,
+                "ai_response": ai_response
+            }
+            
+        except Exception as groq_error:
+            print(f"Groq API error: {groq_error}")
+            # Fallback to local analysis
+            decision_data = generate_fallback_decision(project_history, completion_rate, current_workload)
+            return {
+                "success": True,
+                "decision": decision_data,
+                "source": "fallback"
+            }
+            
+    except Exception as e:
+        print(f"Error in project analysis: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def parse_ai_decision(ai_response: str, project_history: dict, completion_rate: float, current_workload: int):
+    """
+    Parse AI response and structure the decision data
+    """
+    # Extract decision keywords from AI response
+    ai_lower = ai_response.lower()
+    
+    if "proceed" in ai_lower and "caution" not in ai_lower:
+        decision = "proceed"
+        confidence = 85
+    elif "caution" in ai_lower:
+        decision = "caution"
+        confidence = 70
+    elif "defer" in ai_lower:
+        decision = "defer"
+        confidence = 90
+    else:
+        decision = "proceed"
+        confidence = 80
+    
+    # Extract confidence if mentioned
+    import re
+    confidence_match = re.search(r'(\d+)%', ai_response)
+    if confidence_match:
+        confidence = int(confidence_match.group(1))
+    
+    # Calculate timeline
+    completed_projects = project_history.get('completedProjects', [])
+    if completed_projects:
+        # This would need actual timeline calculation from project data
+        timeline = 30  # Default for now
+    else:
+        timeline = 30
+    
+    return {
+        "decision": {
+            "recommendation": decision,
+            "confidence": confidence,
+            "reasoning": ai_response[:200] + "..." if len(ai_response) > 200 else ai_response
+        },
+        "timeline": {
+            "suggested": timeline,
+            "reasoning": f"Recommended based on performance analysis"
+        },
+        "workload": {
+            "currentLoad": current_workload,
+            "recommendation": f"Current workload: {current_workload} projects",
+            "status": "high" if current_workload >= 5 else "moderate" if current_workload >= 3 else "low"
+        },
+        "insights": extract_insights_from_ai_response(ai_response, project_history, completion_rate)
+    }
+
+def generate_fallback_decision(project_history: dict, completion_rate: float, current_workload: int):
+    """
+    Generate decision when AI service is unavailable
+    """
+    avg_payment = project_history.get('averagePayment', 1500)
+    
+    if current_workload >= 5:
+        decision = "defer"
+        confidence = 90
+        reasoning = "Workload at capacity - focus on completing current projects first"
+    elif completion_rate < 70 and project_history.get('totalProjects', 0) > 3:
+        decision = "caution"
+        confidence = 75
+        reasoning = f"Completion rate of {completion_rate:.1f}% needs improvement"
+    else:
+        decision = "proceed"
+        confidence = 85
+        reasoning = "Good capacity and performance metrics"
+    
+    return {
+        "decision": {
+            "recommendation": decision,
+            "confidence": confidence,
+            "reasoning": reasoning
+        },
+        "timeline": {
+            "suggested": 30,
+            "reasoning": "Standard timeline recommendation"
+        },
+        "workload": {
+            "currentLoad": current_workload,
+            "recommendation": f"Current workload: {current_workload} projects",
+            "status": "high" if current_workload >= 5 else "moderate" if current_workload >= 3 else "low"
+        },
+        "insights": [
+            f"Portfolio: {project_history.get('totalProjects', 0)} projects, {completion_rate:.1f}% completion rate",
+            f"Performance: {len(project_history.get('completedProjects', []))} completed projects",
+            f"Capacity: {5 - current_workload} slots available",
+            f"Recommendation: {decision.upper()}"
+        ]
+    }
+
+def extract_insights_from_ai_response(ai_response: str, project_history: dict, completion_rate: float):
+    """
+    Extract key insights from AI response
+    """
+    # Simple extraction - in practice, you'd use more sophisticated NLP
+    insights = []
+    
+    lines = ai_response.split('\n')
+    for line in lines:
+        if any(keyword in line.lower() for keyword in ['insight', 'key', 'important', 'recommend', 'suggest']):
+            clean_line = line.strip('- *').strip()
+            if clean_line and len(clean_line) > 10:
+                insights.append(clean_line)
+    
+    # Fallback insights
+    if not insights:
+        insights = [
+            f"Portfolio analysis: {project_history.get('totalProjects', 0)} projects tracked",
+            f"Performance: {completion_rate:.1f}% completion rate",
+            f"Current capacity: {5 - project_history.get('currentWorkload', 0)} project slots available",
+            "AI recommends data-driven project decisions"
+        ]
+    
+    return insights[:4]  # Return max 4 insights
+
+@app.post("/api/dashboard-summary")
+async def generate_dashboard_summary(request: dict):
+    """
+    Generate simple AI summary of dashboard data
+    """
+    try:
+        user_id = request.get('user_id')
+        data = request.get('dashboard_data', {})
+        
+        # Build context for simple summary
+        context = f"""
+        Please provide a simple, natural summary of this freelancer's dashboard data in 2-3 sentences.
+        
+        DASHBOARD DATA:
+        - Total Projects: {data.get('totalProjects', 0)}
+        - Completed Projects: {data.get('completedProjects', 0)}
+        - Ongoing Projects: {data.get('ongoingProjects', 0)}
+        - Completion Rate: {data.get('completionRate', 0):.1f}%
+        - Total Earnings: ${data.get('totalEarnings', 0):,.2f}
+        - This Month's Earnings: ${data.get('monthlyEarnings', 0):,.2f} (based on project completion dates)
+        - Most Common Project Type: {data.get('mostCommonType', 'None')}
+        
+        Write a friendly, conversational summary that explains what these numbers mean in simple terms.
+        Don't give business advice or recommendations - just summarize the current state.
+        """
+        
+        # Use Groq for intelligent summary
+        try:
+            response = client.chat.completions.create(
+                model="mixtral-8x7b-32768",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that explains data in simple, friendly language. Keep responses concise and conversational."},
+                    {"role": "user", "content": context}
+                ],
+                temperature=0.3,
+                max_tokens=200
+            )
+            
+            ai_summary = response.choices[0].message.content.strip()
+            
+            return {
+                "success": True,
+                "summary": ai_summary
+            }
+            
+        except Exception as groq_error:
+            print(f"Groq API error: {groq_error}")
+            # Fallback to local summary
+            local_summary = generate_simple_fallback(data)
+            return {
+                "success": True,
+                "summary": local_summary,
+                "source": "fallback"
+            }
+            
+    except Exception as e:
+        print(f"Error in dashboard summary: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def generate_simple_fallback(data):
+    """
+    Generate simple fallback summary when AI service is unavailable
+    """
+    total = data.get('totalProjects', 0)
+    completed = data.get('completedProjects', 0)
+    ongoing = data.get('ongoingProjects', 0)
+    completion_rate = data.get('completionRate', 0)
+    total_earnings = data.get('totalEarnings', 0)
+    monthly_earnings = data.get('monthlyEarnings', 0)
+    most_common = data.get('mostCommonType', 'None')
+    
+    summary = f"You currently have {total} projects in your portfolio"
+    
+    if completed > 0:
+        summary += f", with {completed} completed successfully ({completion_rate:.1f}% completion rate)"
+    
+    if ongoing > 0:
+        summary += f" and {ongoing} currently active"
+    
+    summary += ". "
+    
+    if total_earnings > 0:
+        summary += f"Your total earnings are ${total_earnings:,.0f}"
+        if monthly_earnings > 0:
+            summary += f", including ${monthly_earnings:,.0f} earned this month"
+        summary += ". "
+    
+    if most_common and most_common != 'None':
+        summary += f"Most of your work focuses on {most_common} projects. "
+    
+    summary += "This gives you a clear picture of your current freelance status."
+    
+    return summary
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",

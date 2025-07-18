@@ -290,7 +290,7 @@ export default function ProjectManagementPage() {
               if (
                 !formData.name ||
                 !formData.client ||
-                !formData.startDate ||
+                !formData.start_date ||
                 !formData.deadline ||
                 formData.payment === "" ||
                 !formData.difficulty ||
@@ -304,9 +304,9 @@ export default function ProjectManagementPage() {
                 user_id: userId,
                 project_name: formData.name,
                 client_name: formData.client,
-                start_date: formData.startDate,
+                start_date: formData.start_date,
                 deadline: formData.deadline,
-                payment_amount: Math.min(parseInt(formData.payment) || 0, 2147483647),
+                payment_amount: Math.min(parseFloat(formData.payment.toString().replace(/,/g, '')) || 0, 2147483647),
                 difficulty_level: formData.difficulty,
                 type_id: formData.type,
                 status_id: formData.status,
@@ -352,7 +352,7 @@ export default function ProjectManagementPage() {
               if (
                 !formData.name ||
                 !formData.client ||
-                !formData.startDate ||
+                !formData.start_date ||
                 !formData.deadline ||
                 formData.payment === "" ||
                 !formData.difficulty ||
@@ -367,9 +367,9 @@ export default function ProjectManagementPage() {
                 .update({
                   project_name: formData.name,
                   client_name: formData.client,
-                  start_date: formData.startDate,
+                  start_date: formData.start_date,
                   deadline: formData.deadline,
-                  payment_amount: Math.min(parseInt(formData.payment) || 0, 2147483647),
+                  payment_amount: Math.min(parseFloat(formData.payment.toString().replace(/,/g, '')) || 0, 2147483647),
                   difficulty_level: formData.difficulty,
                   type_id: formData.type,
                   status_id: formData.status,
@@ -417,7 +417,7 @@ export default function ProjectManagementPage() {
                   id: data.project_id,
                   name: data.project_name,
                   client: data.client_name,
-                  startDate: data.start_date,
+                  start_date: data.start_date,
                   deadline: data.deadline,
                   payment: data.payment_amount,
                   difficulty: data.difficulty_level,

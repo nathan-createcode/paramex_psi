@@ -20,7 +20,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
   const [formData, setFormData] = useState({
     name: "",
     client: "",
-    startDate: "",
+    start_date: new Date().toISOString().split('T')[0],
     deadline: "",
     payment: "",
     difficulty: "",
@@ -45,7 +45,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
       setFormData({
         name: initialData.name || "",
         client: initialData.client || "",
-        startDate: initialData.startDate || "",
+        start_date: initialData.start_date || "",
         deadline: initialData.deadline || "",
         payment: initialData.payment || "",
         difficulty: initialData.difficulty || "",
@@ -125,82 +125,184 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
   // Generate AI recommendations based on project history
   const generateAIRecommendations = async () => {
-    if (projectHistory.length === 0) return;
+    if (projectHistory.length === 0) {
+      // For new users, provide basic recommendations
+      setAiRecommendations({
+        decision: {
+          recommendation: "proceed",
+          confidence: 85,
+          reasoning: "This is your first project - perfect time to start building your portfolio!"
+        },
+        pricing: {
+          suggested: 1500,
+          range: { min: 1000, max: 2500 },
+          reasoning: "Market-standard pricing for new freelancers"
+        },
+        timeline: {
+          suggested: 30,
+          reasoning: "Standard timeline for first project to ensure quality delivery"
+        },
+        workload: {
+          currentLoad: 0,
+          recommendation: "Ideal time to start - no current workload",
+          status: "low"
+        },
+        insights: [
+          "This will be your first project - exciting opportunity to build reputation",
+          "Focus on delivering high quality to get positive reviews",
+          "Consider starting with a moderate scope to build confidence"
+        ]
+      });
+      return;
+    }
     
     setRecommendationsLoading(true);
     try {
-      // Analyze project history
-      const completedProjects = projectHistory.filter(p => p.status_id?.status_name === "Done");
-      const ongoingProjects = projectHistory.filter(p => 
-        p.status_id?.status_name === "On-Process" || p.status_id?.status_name === "On-Plan"
-      );
+      // Prepare project data for AI analysis
+      const projectData = {
+        totalProjects: projectHistory.length,
+        completedProjects: projectHistory.filter(p => p.status_id?.status_name === "Done"),
+        ongoingProjects: projectHistory.filter(p => 
+          p.status_id?.status_name === "On-Process" || p.status_id?.status_name === "On-Plan"
+        ),
+        projectTypes: projectHistory.map(p => p.type_id?.type_name).filter(Boolean),
+        averagePayment: projectHistory.reduce((sum, p) => sum + (p.payment_amount || 0), 0) / projectHistory.length,
+        recentProjects: projectHistory.slice(0, 5)
+      };
+
+      // Calculate success metrics
+      const completionRate = (projectData.completedProjects.length / projectData.totalProjects) * 100;
+      const currentWorkload = projectData.ongoingProjects.length;
       
-      // Calculate averages and patterns
-      const avgPayment = completedProjects.length > 0 ? 
-        completedProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0) / completedProjects.length : 0;
-      
-      // Calculate average timeline from all completed projects
-      let totalDuration = 0;
-      let validProjects = 0;
-      
-      completedProjects.forEach(p => {
-        if (p.start_date && p.deadline) {
-          const start = new Date(p.start_date);
-          const end = new Date(p.deadline);
-          const duration = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-          if (duration > 0) {
-            totalDuration += duration;
-            validProjects++;
-          }
-        }
+      // Call AI backend for intelligent decision making
+      const aiResponse = await fetch('http://localhost:8000/api/project-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: (await supabase.auth.getSession()).data.session?.user.id,
+          project_history: projectData,
+          completion_rate: completionRate,
+          current_workload: currentWorkload,
+          request_type: 'new_project_decision'
+        })
       });
+
+      let aiDecision;
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json();
+        aiDecision = aiData.decision;
+      } else {
+        // Fallback to local analysis if AI service is down
+        aiDecision = generateLocalAnalysis(projectData, completionRate, currentWorkload);
+      }
+
+      setAiRecommendations(aiDecision);
       
-      const avgTimeline = validProjects > 0 ? Math.round(totalDuration / validProjects) : 30;
-      
-      // Generate recommendations
-      const recommendations = {
-        pricing: {
-          suggested: Math.round(avgPayment * 1.1), // 10% higher than average
-          range: {
-            min: Math.round(avgPayment * 0.8),
-            max: Math.round(avgPayment * 1.3)
-          },
-          reasoning: completedProjects.length > 0 ? 
-            `Based on your ${completedProjects.length} completed projects, with average payment of $${Math.round(avgPayment).toLocaleString()}` :
-            "No completed projects yet. Start with market research pricing."
-        },
-        timeline: {
-          suggested: avgTimeline,
-          reasoning: validProjects > 0 ? 
-            `Based on ${validProjects} completed projects, average duration is ${avgTimeline} days` :
-            "Standard timeline recommendation for new projects"
-        },
-        workload: {
-          currentLoad: ongoingProjects.length,
-          recommendation: ongoingProjects.length >= 5 ? 
-            "Your workload is high - I recommend focusing on current projects first" :
-            "Your workload allows for new projects",
-          status: ongoingProjects.length >= 5 ? "high" : ongoingProjects.length >= 3 ? "moderate" : "low"
-        },
-        insights: [
-          completedProjects.length > 0 ? 
-            `You have a ${Math.round((completedProjects.length / projectHistory.length) * 100)}% completion rate` :
-            "This will be your first project - exciting!",
-          validProjects > 0 ? 
-            `Average project duration in your portfolio is ${avgTimeline} days` :
-            "Build a diverse portfolio with different project types",
-          ongoingProjects.length > 0 ? 
-            `You currently have ${ongoingProjects.length} projects in progress` :
-            "Perfect time to start a new project with no current workload"
-        ]
+    } catch (error) {
+      console.error("Error generating AI recommendations:", error);
+      // Fallback to local analysis
+      const projectData = {
+        totalProjects: projectHistory.length,
+        completedProjects: projectHistory.filter(p => p.status_id?.status_name === "Done"),
+        ongoingProjects: projectHistory.filter(p => 
+          p.status_id?.status_name === "On-Process" || p.status_id?.status_name === "On-Plan"
+        ),
       };
       
-      setAiRecommendations(recommendations);
-    } catch (error) {
-      console.error("Error generating recommendations:", error);
+      const completionRate = (projectData.completedProjects.length / projectData.totalProjects) * 100;
+      const currentWorkload = projectData.ongoingProjects.length;
+      
+      const localDecision = generateLocalAnalysis(projectData, completionRate, currentWorkload);
+      setAiRecommendations(localDecision);
     } finally {
       setRecommendationsLoading(false);
     }
+  };
+
+  // Local fallback analysis
+  const generateLocalAnalysis = (projectData, completionRate, currentWorkload) => {
+    const avgPayment = projectData.totalProjects > 0 ? 
+      projectHistory.reduce((sum, p) => sum + (p.payment_amount || 0), 0) / projectHistory.length : 1500;
+    
+    // Calculate average timeline
+    let totalDuration = 0;
+    let validProjects = 0;
+    
+    projectData.completedProjects.forEach(p => {
+      if (p.start_date && p.deadline) {
+        const start = new Date(p.start_date);
+        const end = new Date(p.deadline);
+        const duration = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+        if (duration > 0) {
+          totalDuration += duration;
+          validProjects++;
+        }
+      }
+    });
+    
+    const avgTimeline = validProjects > 0 ? Math.round(totalDuration / validProjects) : 30;
+    
+    // AI Decision Logic
+    let decision, confidence, reasoning;
+    
+    if (currentWorkload >= 5) {
+      decision = "defer";
+      confidence = 90;
+      reasoning = "Your workload is at capacity (5+ active projects). Focus on completing current projects first to maintain quality.";
+    } else if (completionRate < 70 && projectData.totalProjects > 3) {
+      decision = "caution";
+      confidence = 75;
+      reasoning = `Your completion rate is ${completionRate.toFixed(1)}%. Consider improving current project delivery before taking on new work.`;
+    } else if (currentWorkload <= 2 && completionRate >= 80) {
+      decision = "proceed";
+      confidence = 95;
+      reasoning = `Excellent opportunity! You have low workload (${currentWorkload} projects) and strong completion rate (${completionRate.toFixed(1)}%).`;
+    } else {
+      decision = "proceed";
+      confidence = 80;
+      reasoning = `Good position to take on new work. Current workload: ${currentWorkload} projects.`;
+    }
+
+    return {
+      decision: {
+        recommendation: decision,
+        confidence: confidence,
+        reasoning: reasoning
+      },
+      pricing: {
+        suggested: Math.round(avgPayment * 1.1),
+        range: {
+          min: Math.round(avgPayment * 0.8),
+          max: Math.round(avgPayment * 1.3)
+        },
+        reasoning: `Based on ${projectData.totalProjects} projects with average payment of $${Math.round(avgPayment).toLocaleString()}`
+      },
+      timeline: {
+        suggested: avgTimeline,
+        reasoning: validProjects > 0 ? 
+          `Based on ${validProjects} completed projects (avg: ${avgTimeline} days)` :
+          "Standard timeline recommendation"
+      },
+      workload: {
+        currentLoad: currentWorkload,
+        recommendation: currentWorkload >= 5 ? 
+          "HIGH WORKLOAD - Consider deferring new projects" :
+          currentWorkload >= 3 ? 
+          "MODERATE WORKLOAD - Proceed with caution" :
+          "LOW WORKLOAD - Good capacity for new projects",
+        status: currentWorkload >= 5 ? "high" : currentWorkload >= 3 ? "moderate" : "low"
+      },
+      insights: [
+        `Portfolio: ${projectData.totalProjects} total projects, ${completionRate.toFixed(1)}% completion rate`,
+        `Performance: ${projectData.completedProjects.length} completed, ${currentWorkload} active projects`,
+        `Capacity: ${5 - currentWorkload} project slots available for optimal performance`,
+        decision === "proceed" ? "AI recommends proceeding with this project" :
+        decision === "caution" ? "AI suggests careful consideration before proceeding" :
+        "AI recommends deferring this project"
+      ]
+    };
   };
 
   // Auto-generate recommendations when project history is loaded
@@ -212,28 +314,6 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Additional validation before submit
-    if (!editMode) {
-      const startDate = new Date(formData.startDate);
-      const deadline = new Date(formData.deadline);
-      
-      if (deadline < startDate) {
-        alert("Deadline cannot be before start date");
-        return;
-      }
-    }
-    
-    // Additional validation before submit
-    if (!editMode) {
-      const startDate = new Date(formData.startDate);
-      const deadline = new Date(formData.deadline);
-      
-      if (deadline < startDate) {
-        alert("Deadline cannot be before start date");
-        return;
-      }
-    }
     
     await onSubmit(formData);
   };
@@ -329,23 +409,27 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     }
     
     // Special handling for date fields when not in edit mode
-    if (!editMode && (name === "startDate" || name === "deadline")) {
-      const selectedDate = new Date(value);
-      
-      // If setting deadline, make sure it's not before start date
-      if (name === "deadline" && formData.startDate) {
-        const startDate = new Date(formData.startDate);
-        if (selectedDate < startDate) {
-          alert("Deadline cannot be before start date");
+    if (!editMode && (name === "start_date" || name === "deadline")) {
+      // Validate date relationships
+      if (name === "start_date" && formData.deadline) {
+        const startDate = new Date(value);
+        const deadlineDate = new Date(formData.deadline);
+        if (startDate > deadlineDate) {
+          // If start date is after deadline, clear deadline
+          setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+            deadline: "",
+          }));
           return;
         }
       }
       
-      // If setting start date, make sure existing deadline is not before it
-      if (name === "startDate" && formData.deadline) {
-        const deadlineDate = new Date(formData.deadline);
-        if (deadlineDate < selectedDate) {
-          alert("Start date cannot be after deadline");
+      if (name === "deadline" && formData.start_date) {
+        const startDate = new Date(formData.start_date);
+        const deadlineDate = new Date(value);
+        if (deadlineDate < startDate) {
+          // If deadline is before start date, don't update
           return;
         }
       }
@@ -455,7 +539,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <div className="p-6 pb-6">
             {/* AI Recommendations Section */}
             {!editMode && (
               <div className="mb-6">
@@ -482,57 +566,115 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       </div>
                     ) : aiRecommendations ? (
                       <div className="space-y-4">
-                        {/* Workload Status */}
-                        <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
-                          <div className={`w-3 h-3 rounded-full ${
-                            aiRecommendations.workload.status === "high" ? "bg-red-500" :
-                            aiRecommendations.workload.status === "moderate" ? "bg-yellow-500" :
-                            "bg-green-500"
-                          }`}></div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-800">Current Workload:</span>
-                              <span className="text-sm text-gray-600">
-                                {aiRecommendations.workload.currentLoad} active projects
-                              </span>
+                        {/* AI Decision & Workload Combined */}
+                        <div className={`p-4 rounded-xl border-2 ${
+                          aiRecommendations.decision.recommendation === "proceed" 
+                            ? "bg-green-50 border-green-200" 
+                            : aiRecommendations.decision.recommendation === "caution"
+                            ? "bg-yellow-50 border-yellow-200"
+                            : "bg-red-50 border-red-200"
+                        }`}>
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`p-2 rounded-full ${
+                              aiRecommendations.decision.recommendation === "proceed" 
+                                ? "bg-green-500" 
+                                : aiRecommendations.decision.recommendation === "caution"
+                                ? "bg-yellow-500"
+                                : "bg-red-500"
+                            }`}>
+                              {aiRecommendations.decision.recommendation === "proceed" ? (
+                                <CheckCircle className="w-5 h-5 text-white" />
+                              ) : aiRecommendations.decision.recommendation === "caution" ? (
+                                <AlertCircle className="w-5 h-5 text-white" />
+                              ) : (
+                                <X className="w-5 h-5 text-white" />
+                              )}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {aiRecommendations.workload.recommendation}
-                            </p>
+                            <div className="flex-1">
+                              <h4 className={`font-bold text-lg ${
+                                aiRecommendations.decision.recommendation === "proceed" 
+                                  ? "text-green-800" 
+                                  : aiRecommendations.decision.recommendation === "caution"
+                                  ? "text-yellow-800"
+                                  : "text-red-800"
+                              }`}>
+                                AI Decision: {
+                                  aiRecommendations.decision.recommendation === "proceed" ? "PROCEED" :
+                                  aiRecommendations.decision.recommendation === "caution" ? "PROCEED WITH CAUTION" :
+                                  "DEFER PROJECT"
+                                }
+                              </h4>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-sm font-medium ${
+                                  aiRecommendations.decision.recommendation === "proceed" 
+                                    ? "text-green-700" 
+                                    : aiRecommendations.decision.recommendation === "caution"
+                                    ? "text-yellow-700"
+                                    : "text-red-700"
+                                }`}>
+                                  Confidence: {aiRecommendations.decision.confidence}%
+                                </span>
+                                <div className={`w-16 h-2 rounded-full ${
+                                  aiRecommendations.decision.recommendation === "proceed" 
+                                    ? "bg-green-200" 
+                                    : aiRecommendations.decision.recommendation === "caution"
+                                    ? "bg-yellow-200"
+                                    : "bg-red-200"
+                                }`}>
+                                  <div 
+                                    className={`h-2 rounded-full ${
+                                      aiRecommendations.decision.recommendation === "proceed" 
+                                        ? "bg-green-500" 
+                                        : aiRecommendations.decision.recommendation === "caution"
+                                        ? "bg-yellow-500"
+                                        : "bg-red-500"
+                                    }`}
+                                    style={{ width: `${aiRecommendations.decision.confidence}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                            <div className={`w-3 h-3 rounded-full ${
+                              aiRecommendations.workload.status === "high" ? "bg-red-500" :
+                              aiRecommendations.workload.status === "moderate" ? "bg-yellow-500" :
+                              "bg-green-500"
+                            }`}></div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-medium text-gray-800">Current Workload:</span>
+                                <span className="text-sm text-gray-600">
+                                  {aiRecommendations.workload.currentLoad} active projects
+                                </span>
+                              </div>
+                              <p className={`text-sm ${
+                                aiRecommendations.decision.recommendation === "proceed" 
+                                  ? "text-green-700" 
+                                  : aiRecommendations.decision.recommendation === "caution"
+                                  ? "text-yellow-700"
+                                  : "text-red-700"
+                              }`}>
+                                {aiRecommendations.decision.reasoning}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                        
-                        {/* Recommendations Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Timeline Recommendation */}
-                          <div className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Clock className="w-4 h-4 text-gray-600" />
-                              <span className="font-medium text-gray-800">Timeline Suggestion</span>
-                            </div>
-                            <div className="text-2xl font-bold text-gray-900 mb-1">
-                              {aiRecommendations.timeline.suggested} days
-                            </div>
-                            <p className="text-xs text-gray-500">
-                              {aiRecommendations.timeline.reasoning}
-                            </p>
+
+                        {/* AI Analysis & Insights */}
+                        <div className="bg-white rounded-lg p-4 border border-gray-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Brain className="w-4 h-4 text-gray-600" />
+                            <span className="font-medium text-gray-800">AI Analysis & Insights</span>
                           </div>
-                          
-                          {/* Key Insights */}
-                          <div className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Lightbulb className="w-4 h-4 text-gray-600" />
-                              <span className="font-medium text-gray-800">Key Insights</span>
-                            </div>
-                            <ul className="space-y-1">
-                              {aiRecommendations.insights.map((insight, index) => (
-                                <li key={index} className="text-xs text-gray-600 flex items-start gap-1">
-                                  <div className="w-1 h-1 bg-gray-400 rounded-full mt-1.5 flex-shrink-0"></div>
-                                  {insight}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+                          <ul className="space-y-1">
+                            {aiRecommendations.insights.map((insight, index) => (
+                              <li key={index} className="text-xs text-gray-600 flex items-start gap-1">
+                                <div className="w-1 h-1 bg-gray-400 rounded-full mt-1.5 flex-shrink-0"></div>
+                                {insight}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
                     ) : projectHistory.length === 0 ? (
@@ -607,8 +749,8 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       type="date"
-                      name="startDate"
-                      value={formData.startDate}
+                      name="start_date"
+                      value={formData.start_date}
                       onChange={handleChange}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
@@ -627,7 +769,6 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       name="deadline"
                       value={formData.deadline}
                       onChange={handleChange}
-                      min={!editMode ? formData.startDate : undefined}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     />
@@ -744,29 +885,32 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                   </div>
                 </div>
               </div>
-
-              {/* Form Actions - Fixed at bottom */}
-              <div className="flex gap-3 pt-6 border-t border-gray-200 bg-white sticky bottom-0">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    editMode ? "Save Changes" : "Save Project"
-                  )}
-                </button>
-              </div>
             </form>
+          </div>
+        </div>
+
+        {/* Form Actions - Sticky Bottom */}
+        <div className="flex-shrink-0 p-6 bg-white border-t border-gray-200 rounded-b-2xl">
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              onClick={handleSubmit}
+              className="flex-1 bg-blue-500 hover:bg-blue-400 text-white py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                editMode ? "Save Changes" : "Save Project"
+              )}
+            </button>
           </div>
         </div>
       </div>

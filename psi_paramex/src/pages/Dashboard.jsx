@@ -19,6 +19,7 @@ import {
 } from "chart.js"
 import { Line, Bar, Doughnut } from "react-chartjs-2"
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns"
+import { Brain, TrendingUp, AlertCircle, CheckCircle, Lightbulb } from "lucide-react"
 
 // Register Chart.js components including Filler
 ChartJS.register(
@@ -52,104 +53,117 @@ ChartJS.register(
 //   5: "#EF4444", // Mobile Development - Red
 // }
 
-// Chart options
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: "bottom",
-      labels: {
-        usePointStyle: true,
-        padding: 20,
-        font: {
-          size: 12,
+// Dynamic chart options based on time filter and data length
+const getDynamicChartOptions = (timeFilter, dataLength) => {
+  const baseOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 12,
+          },
+        },
+      },
+      tooltip: {
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        titleColor: "white",
+        bodyColor: "white",
+        borderColor: "rgba(255, 255, 255, 0.1)",
+        borderWidth: 1,
+        cornerRadius: 8,
+        padding: 12,
+      },
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
+          maxRotation: timeFilter === "all" ? 45 : 0, // Rotate labels for all time view
+          minRotation: timeFilter === "all" ? 45 : 0,
+          maxTicksLimit: timeFilter === "all" ? 12 : undefined, // Limit ticks for all time
+        },
+      },
+      y: {
+        grid: {
+          color: "rgba(0, 0, 0, 0.05)",
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
         },
       },
     },
-    tooltip: {
-      backgroundColor: "rgba(0, 0, 0, 0.8)",
-      titleColor: "white",
-      bodyColor: "white",
-      borderColor: "rgba(255, 255, 255, 0.1)",
-      borderWidth: 1,
-      cornerRadius: 8,
-      padding: 12,
-    },
-  },
-  scales: {
-    x: {
-      grid: {
-        display: false,
-      },
-      ticks: {
-        font: {
-          size: 11,
-        },
+  };
+
+  return baseOptions;
+};
+
+// Specific options for earnings chart (without legend)
+const getDynamicEarningsChartOptions = (timeFilter, dataLength) => {
+  const baseOptions = getDynamicChartOptions(timeFilter, dataLength);
+  return {
+    ...baseOptions,
+    plugins: {
+      ...baseOptions.plugins,
+      legend: {
+        display: false, // Hide legend for earnings chart
       },
     },
-    y: {
-      grid: {
-        color: "rgba(0, 0, 0, 0.05)",
-      },
-      ticks: {
-        font: {
-          size: 11,
-        },
-      },
-    },
-  },
-}
+  };
+};
 
 // Specific options for Project Types Chart (with enhanced tooltip)
-const typesChartOptions = {
-  ...chartOptions,
-  animation: {
-    easing: 'easeInOutQuart', // Smoother easing
-  },
-  interaction: {
-    intersect: false, // Better hover behavior
-  },
-  plugins: {
-    ...chartOptions.plugins,
-    legend: {
-      display: false, // Hide legend since we show type names on x-axis
+const getDynamicTypesChartOptions = (timeFilter, dataLength) => {
+  const baseOptions = getDynamicChartOptions(timeFilter, dataLength);
+  return {
+    ...baseOptions,
+    animation: {
+      easing: 'easeInOutQuart', // Smoother easing
     },
-    tooltip: {
-      ...chartOptions.plugins.tooltip,
-      callbacks: {
-        label: (context) => {
-          return `${context.label}: ${context.parsed.y} projects`;
-        },
-        afterBody: () => {
-          return 'Filtered View: Shows only projects in selected time period';
+    interaction: {
+      intersect: false, // Better hover behavior
+    },
+    plugins: {
+      ...baseOptions.plugins,
+      legend: {
+        display: false, // Hide legend since we show type names on x-axis
+      },
+      tooltip: {
+        ...baseOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => {
+            return `${context.label}: ${context.parsed.y} projects`;
+          },
+          afterBody: () => {
+            return 'Filtered View: Shows only projects in selected time period';
+          },
         },
       },
     },
-  },
-  scales: {
-    ...chartOptions.scales,
-    x: {
-      ...chartOptions.scales.x,
-      ticks: {
-        ...chartOptions.scales.x.ticks,
-        maxRotation: 45, // Rotate labels if they're too long
-        minRotation: 0,
+    scales: {
+      ...baseOptions.scales,
+      x: {
+        ...baseOptions.scales.x,
+        ticks: {
+          ...baseOptions.scales.x.ticks,
+          maxRotation: 45, // Rotate labels if they're too long
+          minRotation: 0,
+        },
       },
     },
-  },
-}
-
-// Specific options for Earnings Chart (without legend)
-const earningsChartOptions = {
-  ...chartOptions,
-  plugins: {
-    ...chartOptions.plugins,
-    legend: {
-      display: false, // Hide legend for earnings chart
-    },
-  },
-}
+  };
+};
 
 // Icon Components dengan warna
 const BarChart3Icon = ({ color = "#3B82F6" }) => (
@@ -201,20 +215,14 @@ const FilterIcon = () => (
   </svg>
 )
 
-const GlobeIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="2" y1="12" x2="22" y2="12" />
-    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-  </svg>
-)
-
 const Dashboard = () => {
   const [user, setUser] = useState(null)
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [timeFilter, setTimeFilter] = useState("all")
+  const [aiSummary, setAiSummary] = useState(null)
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false)
   const navigate = useNavigate()
 
   // Authentication check
@@ -280,12 +288,154 @@ const Dashboard = () => {
       console.log("Unique project types:", [...new Set(mappedProjects?.map(p => p.project_type))])
       
       setProjects(mappedProjects)
+      
+      // Generate AI summary after projects are loaded
+      if (mappedProjects.length > 0) {
+        await generateAISummary(mappedProjects, userId)
+      }
     } catch (error) {
       console.error("Error fetching data:", error)
       setError(error.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Generate AI Dashboard Summary
+  const generateAISummary = async (projectsData, userId) => {
+    setAiSummaryLoading(true)
+    try {
+      // Calculate key metrics for summary
+      const totalProjects = projectsData.length
+      const completedProjects = projectsData.filter(p => p.status === "Done").length
+      const ongoingProjects = projectsData.filter(p => p.status === "On-Process" || p.status === "On-Plan").length
+      const completionRate = totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0
+      const totalEarnings = projectsData.filter(p => p.status === "Done").reduce((sum, p) => sum + (p.payment_amount || 0), 0)
+      const monthlyEarnings = projectsData
+        .filter(p => {
+          if (p.status !== "Done") return false;
+          
+          // Use deadline as the completion date for earnings calculation  
+          const completionDate = new Date(p.deadline)
+          const now = new Date()
+          return completionDate.getMonth() === now.getMonth() && completionDate.getFullYear() === now.getFullYear()
+        })
+        .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
+      
+      // Project types
+      const typeDistribution = projectsData.reduce((acc, p) => {
+        const type = p.project_type || 'Unknown'
+        acc[type] = (acc[type] || 0) + 1
+        return acc
+      }, {})
+      
+      const mostCommonType = Object.entries(typeDistribution).sort((a, b) => b[1] - a[1])[0]
+
+      // Calculate earning potential
+      const earningPotential = projectsData
+        .filter(p => p.status === "On-Plan" || p.status === "On-Process")
+        .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
+
+      // Call AI backend for simple summary
+      const aiResponse = await fetch('http://localhost:8000/api/dashboard-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          dashboard_data: {
+            totalProjects,
+            completedProjects,
+            ongoingProjects,
+            completionRate,
+            totalEarnings,
+            monthlyEarnings,
+            earningPotential,
+            mostCommonType: mostCommonType ? mostCommonType[0] : 'None'
+          }
+        })
+      })
+
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json()
+        setAiSummary({
+          summary: aiData.summary,
+          isSimple: true
+        })
+      } else {
+        // Fallback to local summary
+        const localSummary = generateSimpleLocalSummary({
+          totalProjects,
+          completedProjects,
+          ongoingProjects,
+          completionRate,
+          totalEarnings,
+          monthlyEarnings,
+          earningPotential,
+          mostCommonType: mostCommonType ? mostCommonType[0] : 'None'
+        })
+        setAiSummary({
+          summary: localSummary,
+          isSimple: true
+        })
+      }
+      
+    } catch (error) {
+      console.error("Error generating AI summary:", error)
+      // Fallback to simple local summary
+      const localSummary = generateSimpleLocalSummary({
+        totalProjects: projectsData.length,
+        completedProjects: projectsData.filter(p => p.status === "Done").length,
+        ongoingProjects: projectsData.filter(p => p.status === "On-Process" || p.status === "On-Plan").length,
+        completionRate: projectsData.length > 0 ? (projectsData.filter(p => p.status === "Done").length / projectsData.length) * 100 : 0,
+        totalEarnings: projectsData.filter(p => p.status === "Done").reduce((sum, p) => sum + (p.payment_amount || 0), 0),
+        monthlyEarnings: 0,
+        earningPotential: projectsData.filter(p => p.status === "On-Plan" || p.status === "On-Process").reduce((sum, p) => sum + (p.payment_amount || 0), 0),
+        mostCommonType: 'None'
+      })
+      setAiSummary({
+        summary: localSummary,
+        isSimple: true
+      })
+    } finally {
+      setAiSummaryLoading(false)
+    }
+  }
+
+  // Generate simple local summary
+  const generateSimpleLocalSummary = (data) => {
+    const { totalProjects, completedProjects, ongoingProjects, completionRate, totalEarnings, monthlyEarnings, earningPotential, mostCommonType } = data
+    
+    let summaryText = `Based on your dashboard data, you currently have ${totalProjects} total projects in your portfolio. `
+    
+    if (completedProjects > 0) {
+      summaryText += `You've successfully completed ${completedProjects} projects, giving you a ${completionRate.toFixed(1)}% completion rate. `
+    }
+    
+    if (ongoingProjects > 0) {
+      summaryText += `Right now, you have ${ongoingProjects} active projects that need your attention. `
+      if (earningPotential > 0) {
+        summaryText += `These active projects have a potential earning value of $${earningPotential.toLocaleString()}. `
+      }
+    } else {
+      summaryText += `You currently don't have any active projects - this might be a good time to look for new opportunities. `
+    }
+    
+    if (totalEarnings > 0) {
+      summaryText += `Your total earnings from all projects amount to $${totalEarnings.toLocaleString()}. `
+      if (monthlyEarnings > 0) {
+        summaryText += `This month, you've earned $${monthlyEarnings.toLocaleString()}. `
+      }
+    }
+    
+    if (mostCommonType && mostCommonType !== 'None') {
+      summaryText += `Most of your projects are in the ${mostCommonType} category. `
+    }
+    
+    summaryText += `This gives you a good overview of where your freelance business currently stands.`
+    
+    return summaryText
   }
 
   // Calculate summary data
@@ -310,16 +460,23 @@ const Dashboard = () => {
     const thisMonth = new Date()
     const monthlyEarnings = projects
       .filter((p) => {
-        const projectDate = new Date(p.created_at)
+        if (p.status !== "Done") return false;
+        
+        // Use deadline as the completion date for earnings calculation
+        const completionDate = new Date(p.deadline)
         return (
-          p.status === "Done" &&
-          projectDate.getMonth() === thisMonth.getMonth() &&
-          projectDate.getFullYear() === thisMonth.getFullYear()
+          completionDate.getMonth() === thisMonth.getMonth() &&
+          completionDate.getFullYear() === thisMonth.getFullYear()
         )
       })
       .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
 
     console.log("Monthly earnings:", monthlyEarnings)
+
+    // Calculate earning potential from active projects
+    const activeProjects = projects.filter(p => p.status === "On-Plan" || p.status === "On-Process");
+    const earningPotential = activeProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0);
+    console.log("Earning potential:", earningPotential)
 
     return {
       totalProjects,
@@ -328,6 +485,7 @@ const Dashboard = () => {
       done,
       totalEarnings,
       monthlyEarnings,
+      earningPotential,
     }
   }, [projects])
 
@@ -479,35 +637,137 @@ const Dashboard = () => {
       }],
     }
 
-    // Monthly trends (last 6 months) - Global
-    const last6Months = Array.from({ length: 6 }, (_, i) => {
-      const date = subMonths(new Date(), 5 - i)
-      return {
-        month: format(date, "MMM"),
-        date: date,
-      }
-    })
-
-    // Get all unique types from global projects for trends (global view)
-    const allUniqueTypes = [...new Set(projects.map(p => p.project_type).filter(Boolean))]
+    // Monthly trends - Dynamic period based on filter
+    let trendsPeriod, trendsMonths;
     
-    console.log('All projects count:', projects.length)
-    console.log('All unique types for trends:', allUniqueTypes)
+    if (timeFilter === "all") {
+      // For "all time", calculate period from earliest project to now
+      console.log('🔍 All projects for date analysis:', projects.map(p => ({
+        id: p.id,
+        name: p.name,
+        created_at: p.created_at,
+        start_date: p.start_date,
+        deadline: p.deadline,
+        status: p.status
+      })));
+      
+      const earliestProject = projects.reduce((earliest, project) => {
+        // Try multiple date fields to find the actual earliest date
+        const createdDate = project.created_at ? new Date(project.created_at) : null;
+        const startDate = project.start_date ? new Date(project.start_date) : null;
+        const deadlineDate = project.deadline ? new Date(project.deadline) : null;
+        
+        // Use the earliest available date from the project
+        const projectDate = [createdDate, startDate, deadlineDate]
+          .filter(date => date && !isNaN(date.getTime()))
+          .sort((a, b) => a - b)[0];
+        
+        if (!projectDate) return earliest;
+        
+        console.log(`📅 Project ${project.name}:`, {
+          created_at: createdDate?.toISOString(),
+          start_date: startDate?.toISOString(),
+          deadline: deadlineDate?.toISOString(),
+          earliest_date: projectDate.toISOString()
+        });
+        
+        return !earliest || projectDate < earliest ? projectDate : earliest;
+      }, null);
+      
+      console.log('🎯 Final earliest project date:', earliestProject?.toISOString());
+      
+      if (earliestProject) {
+        const startDate = new Date(earliestProject.getFullYear(), earliestProject.getMonth(), 1); // Start of earliest month
+        const endDate = new Date(); // Current date
+        
+        // Calculate months from earliest to now
+        const monthsFromEarliest = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24 * 30));
+        trendsPeriod = Math.max(6, Math.min(monthsFromEarliest, 36)); // Increased max to 36 months for better coverage
+        
+        console.log('📅 All Time Range:', {
+          earliestProject: earliestProject.toISOString(),
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          monthsFromEarliest,
+          trendsPeriod
+        });
+        
+        // Create months array from earliest project to now
+        trendsMonths = [];
+        let currentDate = new Date(startDate);
+        
+        while (currentDate <= endDate && trendsMonths.length < trendsPeriod) {
+          trendsMonths.push({
+            month: format(currentDate, "MMM yyyy"),
+            date: new Date(currentDate),
+          });
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+        
+        console.log('📊 Trends months created:', trendsMonths.map(m => m.month).join(', '));
+      } else {
+        // Default if no projects - show last 6 months
+        trendsPeriod = 6;
+        trendsMonths = Array.from({ length: trendsPeriod }, (_, i) => {
+          const date = subMonths(new Date(), trendsPeriod - 1 - i);
+          return {
+            month: format(date, "MMM yyyy"),
+            date: date,
+          };
+        });
+      }
+    } else {
+      // For specific time filters, show 3 months context
+      trendsPeriod = 3;
+      trendsMonths = Array.from({ length: trendsPeriod }, (_, i) => {
+        const date = subMonths(new Date(), trendsPeriod - 1 - i);
+        return {
+          month: format(date, "MMM"),
+          date: date,
+        };
+      });
+    }
 
-    const monthlyTrendData = last6Months.map(({ month, date }) => {
-      const monthProjects = projects.filter((project) => {
-        const projectDate = new Date(project.created_at)
-        return isWithinInterval(projectDate, {
-          start: startOfMonth(date),
-          end: endOfMonth(date),
+    // Get all unique types from filtered projects for trends
+    const filteredUniqueTypes = [...new Set(filteredProjects.map(p => p.project_type).filter(Boolean))]
+    
+    console.log('Filtered projects count:', filteredProjects.length)
+    console.log('Filtered unique types for trends:', filteredUniqueTypes)
+    console.log('Trends period:', trendsPeriod, 'months')
+
+    const monthlyTrendData = trendsMonths.map(({ month, date }) => {
+      let monthProjects;
+      
+      if (timeFilter === "all") {
+        // For "all time", use global projects with completion date logic
+        monthProjects = projects.filter((project) => {
+          if (project.status !== "Done") return false;
+          
+          // Use deadline as the completion date for trends calculation
+          const completionDate = new Date(project.deadline)
+          return isWithinInterval(completionDate, {
+            start: startOfMonth(date),
+            end: endOfMonth(date),
+          })
         })
-      })
+      } else {
+        // For specific time filters, use filtered projects
+        monthProjects = filteredProjects.filter((project) => {
+          if (project.status !== "Done") return false;
+          
+          const completionDate = new Date(project.deadline)
+          return isWithinInterval(completionDate, {
+            start: startOfMonth(date),
+            end: endOfMonth(date),
+          })
+        })
+      }
 
-      // Count done projects by type
+      // Count completed projects by type
       const typeData = {}
-      allUniqueTypes.forEach((typeName) => {
+      filteredUniqueTypes.forEach((typeName) => {
         typeData[typeName] = monthProjects.filter(
-          (p) => p.project_type === typeName && p.status === "Done",
+          (p) => p.project_type === typeName,
         ).length
       })
 
@@ -519,7 +779,7 @@ const Dashboard = () => {
 
     const trendsData = {
       labels: monthlyTrendData.map((d) => d.month),
-      datasets: allUniqueTypes.map((typeName, index) => ({
+      datasets: filteredUniqueTypes.map((typeName, index) => ({
         label: typeName,
         data: monthlyTrendData.map((d) => d[typeName] || 0),
         borderColor: defaultColors[index % defaultColors.length],
@@ -529,21 +789,39 @@ const Dashboard = () => {
       })),
     }
 
-    // Monthly earnings data (global)
-    const monthlyEarningsData = last6Months.map(({ month, date }) => {
-      const monthProjects = projects.filter((project) => {
-        const projectDate = new Date(project.created_at)
-        return isWithinInterval(projectDate, {
-          start: startOfMonth(date),
-          end: endOfMonth(date),
+    // Monthly earnings data - Use same dynamic period as trends
+    const earningsMonths = trendsMonths; // Use same period as trends
+    const monthlyEarningsData = earningsMonths.map(({ month, date }) => {
+      let monthProjects;
+      
+      if (timeFilter === "all") {
+        // For "all time", use global projects
+        monthProjects = projects.filter((project) => {
+          if (project.status !== "Done") return false;
+          
+          // Use deadline as the completion date for earnings calculation
+          const completionDate = new Date(project.deadline)
+          return isWithinInterval(completionDate, {
+            start: startOfMonth(date),
+            end: endOfMonth(date),
+          })
         })
-      })
-
-      const completedProjects = monthProjects.filter((p) => p.status === "Done")
+      } else {
+        // For specific time filters, use filtered projects
+        monthProjects = filteredProjects.filter((project) => {
+          if (project.status !== "Done") return false;
+          
+          const completionDate = new Date(project.deadline)
+          return isWithinInterval(completionDate, {
+            start: startOfMonth(date),
+            end: endOfMonth(date),
+          })
+        })
+      }
 
       return {
         month,
-        earnings: completedProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0),
+        earnings: monthProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0),
       }
     })
 
@@ -601,126 +879,126 @@ const Dashboard = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
           <p className="text-lg text-gray-600 leading-relaxed">
-            Welcome back, {user?.user_metadata?.full_name || user?.email}! You have{" "}
-            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg" >
-              {summary.totalProjects} projects
-            </span>
-            ,{" "}
-            <span className="font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
-              {summary.onProcess} in progress
-            </span>
-            , and earned{" "}
-            <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-              ${summary.monthlyEarnings.toLocaleString()} this month
-            </span>
-            .
+            <span className="text-black">Welcome back, {user?.user_metadata?.full_name || user?.email}!</span>
           </p>
         </div>
 
-        {/* Project Summary & Insights Dashboard */}
+        {/* Summary Section */}
         <div className="mb-8">
           <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              Project Summary & Insights
+              <Brain className="w-6 h-6 text-blue-600" />
+              Summary
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Success Rate */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Success Rate</span>
-                  <CheckCircleIcon color="#6B7280" />
+            {/* AI Summary */}
+            <div className="mb-6">
+              {aiSummaryLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-3"></div>
+                  <span className="text-gray-700">AI is analyzing your dashboard...</span>
                 </div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">
+              ) : aiSummary ? (
+                <div className="bg-blue-50 rounded-xl p-6 border border-blue-200 mb-6">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-blue-500 flex-shrink-0">
+                      <Brain className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-gray-800 leading-relaxed text-sm">
+                        {aiSummary.summary}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="text-center py-6 mb-6">
+                  <Brain className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600">No projects found. Create your first project to get AI insights!</p>
+                </div>
+              ) : null}
+            </div>
+            
+            {/* Key Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {/* Total Projects */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Total Projects</span>
+                  <BarChart3Icon color="#3B82F6" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900">{summary.totalProjects}</div>
+              </div>
+              
+              {/* On-Plan */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">On-Plan</span>
+                  <ClockIcon color="#3B82F6" />
+                </div>
+                <div className="text-2xl font-bold text-blue-600">{summary.onPlan}</div>
+              </div>
+              
+              {/* On-Process */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">On-Process</span>
+                  <TrendingUpIcon color="#EAB308" />
+                </div>
+                <div className="text-2xl font-bold text-yellow-600">{summary.onProcess}</div>
+              </div>
+              
+              {/* Done */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Done</span>
+                  <CheckCircleIcon color="#10B981" />
+                </div>
+                <div className="text-2xl font-bold text-green-600">{summary.done}</div>
+              </div>
+              
+              {/* Earning Potential */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Earning Potential</span>
+                  <DollarSignIcon color="#10B981" />
+                </div>
+                <div className="text-xl font-bold text-green-600">${summary.earningPotential.toLocaleString()}</div>
+              </div>
+              
+              {/* Total Earnings */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Total Earnings</span>
+                  <DollarSignIcon color="#10B981" />
+                </div>
+                <div className="text-xl font-bold text-green-600">${summary.totalEarnings.toLocaleString()}</div>
+              </div>
+            </div>
+            
+            {/* Advanced Insights */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Success Rate */}
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-2xl p-4 border border-green-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-green-800">Success Rate</span>
+                  <CheckCircleIcon color="#059669" />
+                </div>
+                <div className="text-2xl font-bold text-green-800 mb-1">
                   {summary.totalProjects > 0 ? Math.round((summary.done / summary.totalProjects) * 100) : 0}%
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-green-700">
                   {summary.done} of {summary.totalProjects} completed
                 </div>
               </div>
               
-              {/* Monthly Income */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Monthly Income</span>
-                  <DollarSignIcon color="#6B7280" />
-                </div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">
-                  ${Math.round(summary.totalEarnings / Math.max(1, 6)).toLocaleString()}
-                </div>
-                <div className="text-xs text-gray-600">
-                  Average last 6 months
-                </div>
-              </div>
-              
-              {/* Active Projects */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Active Projects</span>
-                  <ClockIcon color="#6B7280" />
-                </div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">
-                  {summary.onPlan + summary.onProcess}
-                </div>
-                <div className="text-xs text-gray-600">
-                  Need your attention
-                </div>
-              </div>
-              
-              {/* Growth Trend */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Growth Trend</span>
-                  <TrendingUpIcon color="#6B7280" />
-                </div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">
-                  {(() => {
-                    const thisMonth = new Date();
-                    const lastMonth = new Date(thisMonth.getFullYear(), thisMonth.getMonth() - 1, 1);
-                    const thisMonthProjects = projects.filter(p => {
-                      const projectDate = new Date(p.created_at);
-                      return projectDate.getMonth() === thisMonth.getMonth() && 
-                             projectDate.getFullYear() === thisMonth.getFullYear();
-                    }).length;
-                    const lastMonthProjects = projects.filter(p => {
-                      const projectDate = new Date(p.created_at);
-                      return projectDate.getMonth() === lastMonth.getMonth() && 
-                             projectDate.getFullYear() === lastMonth.getFullYear();
-                    }).length;
-                    const growth = lastMonthProjects > 0 ? 
-                      Math.round(((thisMonthProjects - lastMonthProjects) / lastMonthProjects) * 100) : 0;
-                    return growth > 0 ? `+${growth}%` : `${growth}%`;
-                  })()}
-                </div>
-                <div className="text-xs text-gray-600">
-                  vs last month
-                </div>
-              </div>
-              
-              {/* Earning Potential */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Earning Potential</span>
-                  <DollarSignIcon color="#6B7280" />
-                </div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">
-                  ${projects
-                    .filter(p => p.status === "On-Plan" || p.status === "On-Process")
-                    .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
-                    .toLocaleString()}
-                </div>
-                <div className="text-xs text-gray-600">
-                  Value in active projects
-                </div>
-              </div>
-              
               {/* Best Performing Type */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Best Performer</span>
-                  <TrendingUpIcon color="#6B7280" />
+              <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-2xl p-4 border border-yellow-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-yellow-800">Best Type</span>
+                  <TrendingUpIcon color="#EAB308" />
                 </div>
-                <div className="text-lg font-bold text-gray-900 mb-1">
+                <div className="text-lg font-bold text-yellow-800 mb-1">
                   {(() => {
                     const typeStats = projects.reduce((acc, p) => {
                       if (p.status === "Done") {
@@ -737,74 +1015,34 @@ const Dashboard = () => {
                     return bestType[0] !== "No data" ? bestType[0] : "No data";
                   })()}
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-yellow-700">
                   Highest revenue type
+                </div>
+              </div>
+              
+              {/* Monthly Progress */}
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-blue-800">This Month</span>
+                  <DollarSignIcon color="#2563EB" />
+                </div>
+                <div className="text-2xl font-bold text-blue-800 mb-1">
+                  ${summary.monthlyEarnings.toLocaleString()}
+                </div>
+                <div className="text-xs text-blue-700">
+                  Earned this month
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Summary Cards - 6 Cards seperti di gambar */}
-        <div className="grid grid-cols-5 xl:grid-cols-5 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4 mb-8">
-          {[
-            {
-              title: "Total Projects",
-              value: summary.totalProjects.toString(),
-              icon: BarChart3Icon,
-              iconColor: "#3B82F6",
-              bgColor: "bg-blue-50",
-            },
-            {
-              title: "On-Plan",
-              value: summary.onPlan.toString(),
-              icon: ClockIcon,
-              iconColor: "#3B82F6",
-              bgColor: "bg-blue-50",
-            },
-            {
-              title: "On-Process",
-              value: summary.onProcess.toString(),
-              icon: TrendingUpIcon,
-              iconColor: "#EAB308",
-              bgColor: "bg-yellow-50",
-            },
-            {
-              title: "Done",
-              value: summary.done.toString(),
-              icon: CheckCircleIcon,
-              iconColor: "#10B981",
-              bgColor: "bg-green-50",
-            },
-            {
-              title: "Total Earnings",
-              value: `$${summary.totalEarnings.toLocaleString()}`,
-              icon: DollarSignIcon,
-              iconColor: "#10B981",
-              bgColor: "bg-green-50",
-            },
-          ].map((item, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-2xl p-6 flex items-center gap-4 shadow-md/5 transition-all duration-200 border border-gray-100 cursor-default"
-            > 
-              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${item.bgColor}`}>
-                <item.icon color={item.iconColor} />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600 mb-1">{item.title}</p>
-                <h3 className="text-2xl font-bold text-gray-900">{item.value}</h3>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Filtered Analytics Section */}
+        {/* Analytics Dashboard */}
         <div className="mb-8">
           <div className="flex flex-row gap-4 items-center justify-between mb-6 flex-wrap">
             <div className="flex items-center gap-2">
               <FilterIcon />
-              <h2 className="text-xl font-bold text-gray-900">Filtered Analytics</h2>
+              <h2 className="text-xl font-bold text-gray-900">Analytics Dashboard</h2>
             </div>
             <select
               value={timeFilter}
@@ -819,7 +1057,7 @@ const Dashboard = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Project Status Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
@@ -845,7 +1083,7 @@ const Dashboard = () => {
               </div>
               <div className="h-64 relative">
                 {typesData.labels.length > 0 ? (
-                  <Bar data={typesData} options={typesChartOptions} />
+                  <Bar data={typesData} options={getDynamicTypesChartOptions(timeFilter, projects.length)} />
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     <div className="text-4xl mb-2">📊</div>
@@ -855,27 +1093,19 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Overall Performance Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <GlobeIcon />
-            <h2 className="text-xl font-bold text-gray-900">Overall Performance</h2>
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Trends Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Project Trends</h3>
-                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
-                  <GlobeIcon />
-                  <span>Global View</span>
+                <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
+                  <FilterIcon />
+                  <span>Filtered</span>
                 </div>
               </div>
               <div className="h-64 relative">
-                <Line data={trendsData} options={chartOptions} />
+                <Line data={trendsData} options={getDynamicChartOptions(timeFilter, projects.length)} />
               </div>
             </div>
 
@@ -883,13 +1113,13 @@ const Dashboard = () => {
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Monthly Earnings</h3>
-                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
-                  <GlobeIcon />
-                  <span>Global View</span>
+                <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
+                  <FilterIcon />
+                  <span>Filtered</span>
                 </div>
               </div>
               <div className="h-64 relative">
-                <Line data={earningsData} options={earningsChartOptions} />
+                <Line data={earningsData} options={getDynamicEarningsChartOptions(timeFilter, projects.length)} />
               </div>
             </div>
           </div>
