@@ -1,7 +1,0 @@
-{
-  "name": "paramex_psi",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "echo 'Static site - no dev server needed'"
-  }
-} 
