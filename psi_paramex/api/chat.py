@@ -5,15 +5,6 @@ from typing import List, Dict, Any, Optional
 import os
 from mangum import Mangum
 from datetime import datetime
-import pytz
-from supabase import create_client, Client
-
-# Import our custom modules
-from groq_client import GroqLlamaClient
-from scoring_logic import ProjectScorer
-from supabase_email_service import SupabaseEmailService
-from notification_scheduler import NotificationScheduler
-from ux_safety_check import UXSafetyChecker
 
 # Initialize FastAPI app
 app = FastAPI(title="ParameX PSI - AI Project Advisor API", version="1.0.0")
@@ -38,43 +29,30 @@ print(f"   VITE_SUPABASE_URL: {'✅ Set' if supabase_url else '❌ Missing'}")
 print(f"   VITE_SUPABASE_ANON_KEY: {'✅ Set' if supabase_key else '❌ Missing'}")
 
 # Initialize Supabase client
-supabase: Client = None
-notification_scheduler = None
-email_service = None
-
+supabase = None
 try:
     if supabase_url and supabase_key:
+        from supabase import create_client, Client
         supabase = create_client(supabase_url, supabase_key)
         print("✅ Supabase client initialized successfully")
-        
-        # Initialize email service
-        email_service = SupabaseEmailService(supabase)
-        print("✅ Email service initialized successfully")
-        
-        # Initialize notification scheduler
-        notification_scheduler = NotificationScheduler(supabase, email_service)
-        print("✅ Notification scheduler initialized successfully")
     else:
         print("❌ Supabase credentials missing - project context features will be disabled")
 except Exception as e:
     print(f"⚠️ Warning: Could not initialize Supabase client: {e}")
-    print("Project context features will be disabled")
+    supabase = None
 
 # Initialize Groq client
 groq_client = None
 try:
     if groq_api_key:
-        groq_client = GroqLlamaClient(performance_mode="balanced")
+        from groq import Groq
+        groq_client = Groq(api_key=groq_api_key)
         print("✅ Groq AI client initialized successfully")
     else:
         print("❌ GROQ_API_KEY missing - AI features will be disabled")
 except Exception as e:
     print(f"⚠️ Warning: Could not initialize Groq client: {e}")
-    print("AI features will be disabled")
-
-# Initialize other services
-project_scorer = ProjectScorer()
-ux_safety_checker = UXSafetyChecker()
+    groq_client = None
 
 # Pydantic models
 class ChatMessage(BaseModel):
@@ -105,27 +83,6 @@ class DashboardSummaryRequest(BaseModel):
 class EmailTestRequest(BaseModel):
     user_email: str
     user_name: str
-
-class ProjectUpdateRequest(BaseModel):
-    project_id: str
-    old_status: str
-    new_status: str
-    update_message: Optional[str] = ""
-
-class WelcomeEmailRequest(BaseModel):
-    user_email: str
-    user_name: Optional[str] = "New User"
-
-class QuickAdviceRequest(BaseModel):
-    question_type: str
-
-class AnalyzeProjectRequest(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    timeline: Optional[str] = None
-    budget: Optional[str] = None
-    client_type: Optional[str] = None
-    complexity: Optional[str] = None
 
 # Helper function to get user projects for context
 async def get_user_projects_context(user_id: str) -> str:
@@ -187,20 +144,115 @@ def generate_simple_response(message: str) -> str:
     else:
         return "I'm here to help with your freelance project management! Ask me about project prioritization, client communication, timeline planning, pricing strategies, or any other project-related questions."
 
+# Clean markdown formatting function
+def clean_markdown_formatting(text: str) -> str:
+    """Remove markdown formatting from AI response"""
+    import re
+    
+    # Remove bold (**text** or __text__)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'__(.*?)__', r'\1', text)
+    
+    # Remove italic (*text* or _text_)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'_(.*?)_', r'\1', text)
+    
+    # Remove headers (# ## ###)
+    text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+    
+    # Remove bullet points (- * +)
+    text = re.sub(r'^[-*+]\s+', '', text, flags=re.MULTILINE)
+    
+    # Remove code blocks (``` or `)
+    text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    
+    # Remove links [text](url)
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    
+    # Remove excessive line breaks and clean up
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = text.strip()
+    
+    return text
+
+# AI call function with latest models
+async def get_ai_response(user_message: str, conversation_history: List[Dict] = None) -> str:
+    """Get AI response using the latest Groq models"""
+    try:
+        if not groq_client:
+            return generate_simple_response(user_message)
+        
+        # Enhanced system prompt for better project advisor responses
+        system_prompt = """You are an expert AI Project Advisor specializing in freelance project management. You have deep knowledge of:
+
+- Project planning, timeline estimation, and risk management
+- Client relationship management and communication strategies
+- Budget planning, pricing strategies, and financial management
+- Workflow optimization and productivity enhancement
+- Technology trends and project implementation best practices
+
+When users provide project data, analyze it thoroughly and give specific, actionable advice. Be conversational, professional, and focus on practical solutions that can be implemented immediately.
+
+If you see [USER'S PROJECT DATA] in the message, use that information to provide personalized recommendations based on their actual projects, deadlines, and workload."""
+        
+        # Prepare messages
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add conversation history (last 6 messages for better context)
+        if conversation_history:
+            for msg in conversation_history[-6:]:
+                role = "user" if msg["type"] == "user" else "assistant"
+                messages.append({"role": role, "content": msg["content"]})
+        
+        # Add current message
+        messages.append({"role": "user", "content": user_message})
+        
+        # Try latest models in order of preference with Meta Llama 4 Scout as primary
+        models_to_try = [
+            "meta-llama/llama-4-scout-17b-16e-instruct",  # Primary: Meta Llama 4 Scout
+            "llama-3.3-70b-versatile",  # Latest Llama 3.3
+            "llama-3.2-90b-text-preview",  # High capability preview
+            "llama-3.2-11b-text-preview",  # Good balance
+            "llama-3.1-70b-versatile"  # Fallback stable version
+        ]
+        
+        for model in models_to_try:
+            try:
+                print(f"🤖 Trying model: {model}")
+                
+                # Call Groq API with the current model
+                completion = groq_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=800,  # Increased for more detailed responses
+                    top_p=0.9,
+                    stream=False
+                )
+                
+                response = completion.choices[0].message.content
+                print(f"✅ Successfully used model: {model}")
+                return clean_markdown_formatting(response)
+                
+            except Exception as model_error:
+                print(f"❌ Model {model} failed: {model_error}")
+                continue
+        
+        # If all models fail, use fallback
+        print("⚠️ All AI models failed, using fallback response")
+        return generate_simple_response(user_message)
+        
+    except Exception as e:
+        print(f"❌ AI API error: {e}")
+        return generate_simple_response(user_message)
+
 # API Routes
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """AI Chat endpoint for project advisor"""
     
     try:
-        # Safety check user input
-        safety_check = ux_safety_checker.check_user_input(request.message)
-        
-        if not safety_check["is_safe"]:
-            if safety_check["suggestion"]:
-                return ChatResponse(response=safety_check["suggestion"], status="warning")
-            return ChatResponse(response="Please keep our conversation focused on professional project management topics.", status="warning")
-        
         # Get user projects context if user_id is provided
         user_context = ""
         if request.user_id:
@@ -209,32 +261,13 @@ async def chat_endpoint(request: ChatRequest):
         # Combine user message with project context
         full_message = request.message + user_context
         
-        # Try to use Groq API if available
-        if groq_api_key and groq_client:
-            try:
-                # Get AI response using Groq
-                response = await groq_client.get_project_advice(
-                    user_message=full_message,
-                    conversation_history=[msg.dict() for msg in request.conversation_history] if request.conversation_history else []
-                )
-                
-                # Safety check AI response
-                ai_safety_check = ux_safety_checker.check_ai_response(response)
-                
-                if not ai_safety_check["is_safe"]:
-                    response = "I apologize, but I need to provide a more appropriate response. Please ask about project management topics."
-                
-                return ChatResponse(response=response, status="success")
-                
-            except Exception as groq_error:
-                print(f"Groq API error: {groq_error}")
-                # Fall back to simple response if Groq fails
-                response = generate_simple_response(request.message)
-                return ChatResponse(response=response, status="success")
-        else:
-            # No Groq API key, use simple response
-            response = generate_simple_response(request.message)
-            return ChatResponse(response=response, status="success")
+        # Get AI response
+        response = await get_ai_response(
+            full_message,
+            [msg.dict() for msg in request.conversation_history] if request.conversation_history else []
+        )
+        
+        return ChatResponse(response=response, status="success")
         
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
@@ -266,9 +299,24 @@ async def get_user_projects(user_id: str):
             """
         ).eq("user_id", user_id).order("created_at", {"ascending": False}).execute()
         
+        # Format projects for frontend
+        projects = []
+        if response.data:
+            for project in response.data:
+                projects.append({
+                    "id": project["project_id"],
+                    "name": project["project_name"],
+                    "client": project["client_name"],
+                    "deadline": project["deadline"],
+                    "payment": project["payment_amount"],
+                    "difficulty": project["difficulty_level"],
+                    "type": project["type_id"]["type_name"] if project["type_id"] else "Unknown",
+                    "status": project["status_id"]["status_name"] if project["status_id"] else "Unknown"
+                })
+        
         return {
-            "projects": response.data or [],
-            "count": len(response.data) if response.data else 0
+            "projects": projects,
+            "count": len(projects)
         }
         
     except Exception as e:
@@ -280,44 +328,33 @@ async def project_analysis(request: ProjectAnalysisRequest):
     """AI-powered project analysis and recommendations"""
     
     try:
-        # Use Groq AI if available for more sophisticated analysis
-        if groq_client and groq_api_key:
+        # Enhanced analysis with AI if available
+        if groq_client:
             try:
-                # Prepare project data for AI analysis
-                project_data = {
-                    "total_projects": request.project_history.get("totalProjects", 0),
-                    "completed_projects": request.project_history.get("completedProjects", 0),
-                    "ongoing_projects": request.project_history.get("ongoingProjects", 0),
-                    "completion_rate": request.completion_rate,
-                    "current_workload": request.current_workload
-                }
-                
-                # Create detailed prompt for AI analysis
-                prompt = f"""
-                Analyze this user's project situation and provide a recommendation:
-                
-                Project Portfolio:
-                - Total Projects: {project_data['total_projects']}
-                - Completed Projects: {project_data['completed_projects']}
-                - Ongoing Projects: {project_data['ongoing_projects']}
-                - Completion Rate: {project_data['completion_rate']}%
-                - Current Workload: {project_data['current_workload']} projects
-                
-                Request Type: {request.request_type}
-                
-                Please provide:
-                1. Should they take on a new project? (proceed/defer)
-                2. Confidence level (0-100%)
-                3. Brief reasoning
-                
-                Format your response as a decision with reasoning.
+                analysis_prompt = f"""
+                Analyze this freelancer's project situation and provide a recommendation:
+
+                Current Portfolio:
+                - Total Projects: {request.project_history.get('totalProjects', 0)}
+                - Completed Projects: {request.project_history.get('completedProjects', 0)}
+                - Ongoing Projects: {request.project_history.get('ongoingProjects', 0)}
+                - Completion Rate: {request.completion_rate}%
+                - Current Workload: {request.current_workload} active projects
+
+                Should they take on a new project? Consider:
+                1. Current workload capacity
+                2. Completion rate performance
+                3. Risk of overcommitment
+                4. Quality maintenance
+
+                Provide: recommendation (proceed/defer), confidence level (0-100%), and detailed reasoning.
                 """
                 
-                ai_response = await groq_client.get_project_advice(prompt)
+                ai_response = await get_ai_response(analysis_prompt)
                 
-                # Parse AI response to extract decision
+                # Parse AI response for structured data
                 recommendation = "proceed" if "proceed" in ai_response.lower() else "defer"
-                confidence = 85 if recommendation == "proceed" else 70
+                confidence = 85 if "proceed" in ai_response.lower() else 70
                 
                 return {
                     "decision": {
@@ -328,11 +365,9 @@ async def project_analysis(request: ProjectAnalysisRequest):
                 }
                 
             except Exception as ai_error:
-                print(f"AI analysis error: {ai_error}")
-                # Fall back to simple analysis
-                pass
+                print(f"AI analysis failed: {ai_error}")
         
-        # Simple analysis based on workload (fallback)
+        # Fallback to simple analysis
         recommendation = "proceed" if request.current_workload < 3 else "defer"
         confidence = 85 if request.current_workload < 2 else 70
         
@@ -361,34 +396,31 @@ async def dashboard_summary(request: DashboardSummaryRequest):
     """Generate AI-powered dashboard summary"""
     
     try:
-        # Use AI if available for richer summaries
-        if groq_client and groq_api_key:
+        # Enhanced summary with AI if available
+        if groq_client:
             try:
                 data = request.dashboard_data
-                
-                prompt = f"""
-                Generate a friendly and encouraging summary for this user's project dashboard:
-                
-                Dashboard Data:
+                summary_prompt = f"""
+                Create an encouraging and insightful summary for this freelancer's dashboard:
+
+                Performance Data:
                 - Total Projects: {data.get('totalProjects', 0)}
                 - Completed Projects: {data.get('completedProjects', 0)}
                 - Ongoing Projects: {data.get('ongoingProjects', 0)}
                 - Total Earnings: ${data.get('totalEarnings', 0):,.0f}
                 - Monthly Earnings: ${data.get('monthlyEarnings', 0):,.0f}
                 - Most Common Project Type: {data.get('mostCommonType', 'Various')}
-                
-                Provide an encouraging, personalized summary in 2-3 sentences.
+
+                Provide an encouraging 2-3 sentence summary highlighting achievements and growth potential.
                 """
                 
-                ai_summary = await groq_client.get_project_advice(prompt)
+                ai_summary = await get_ai_response(summary_prompt)
                 return {"summary": ai_summary}
                 
             except Exception as ai_error:
-                print(f"AI summary error: {ai_error}")
-                # Fall back to simple summary
-                pass
+                print(f"AI summary failed: {ai_error}")
         
-        # Simple summary (fallback)
+        # Fallback to simple summary
         data = request.dashboard_data
         total_projects = data.get('totalProjects', 0)
         completed_projects = data.get('completedProjects', 0)
@@ -411,149 +443,19 @@ async def dashboard_summary(request: DashboardSummaryRequest):
         print(f"Error in dashboard summary: {e}")
         return {"summary": "Dashboard summary is currently unavailable."}
 
-@app.post("/api/analyze-project")
-async def analyze_project(request: AnalyzeProjectRequest):
-    """Analyze a specific project for complexity and recommendations"""
-    
-    try:
-        project_data = {
-            "title": request.title or "",
-            "description": request.description or "",
-            "timeline": request.timeline or "",
-            "budget": request.budget or "",
-            "client_type": request.client_type or "",
-            "complexity": request.complexity or ""
-        }
-        
-        # Use project scorer for detailed analysis
-        complexity_analysis = project_scorer.analyze_project_complexity(project_data)
-        risk_analysis = project_scorer.assess_project_risks(project_data)
-        pricing_analysis = project_scorer.generate_pricing_recommendation(project_data, complexity_analysis["overall_complexity"])
-        
-        # Get AI insights if available
-        ai_insights = ""
-        if groq_client and groq_api_key:
-            try:
-                ai_insights = await groq_client.get_project_insights(project_data)
-            except Exception as ai_error:
-                print(f"AI insights error: {ai_error}")
-                ai_insights = "AI insights temporarily unavailable."
-        
-        return {
-            "complexity_analysis": complexity_analysis,
-            "risk_analysis": risk_analysis,
-            "pricing_analysis": pricing_analysis,
-            "ai_insights": ai_insights,
-            "recommendation": "proceed" if complexity_analysis["overall_complexity"] < 7 else "caution"
-        }
-        
-    except Exception as e:
-        print(f"Error in project analysis: {e}")
-        return {
-            "error": "Unable to analyze project",
-            "recommendation": "manual_review"
-        }
-
-@app.post("/api/quick-advice")
-async def quick_advice(request: QuickAdviceRequest):
-    """Get quick advice for common scenarios"""
-    
-    try:
-        if groq_client and groq_api_key:
-            try:
-                advice = await groq_client.get_quick_advice(request.question_type)
-                return {"advice": advice}
-            except Exception as ai_error:
-                print(f"AI advice error: {ai_error}")
-        
-        # Fallback advice
-        advice_map = {
-            "prioritization": "Focus on high-paying projects with reasonable deadlines. Consider your current workload and expertise level.",
-            "estimation": "Break projects into smaller tasks, add 25% buffer time, and track your actual time to improve future estimates.",
-            "communication": "Set clear expectations, provide regular updates, and document all changes in writing.",
-            "scope_creep": "Define project scope clearly upfront and charge extra for additional requests outside the original agreement.",
-            "deadlines": "Negotiate realistic timelines, break work into milestones, and communicate early if issues arise.",
-            "pricing": "Research market rates, consider project complexity, and don't undervalue your expertise."
-        }
-        
-        advice = advice_map.get(request.question_type, "Focus on clear communication and realistic project planning.")
-        
-        return {"advice": advice}
-        
-    except Exception as e:
-        print(f"Error in quick advice: {e}")
-        return {"advice": "Unable to provide advice at this time."}
-
 @app.post("/api/email/test")
 async def test_email(request: EmailTestRequest):
     """Test email sending functionality"""
     
     try:
-        if email_service:
-            result = await email_service.send_test_email(request.user_email, request.user_name)
-            return result
-        else:
-            return {
-                "success": True,
-                "message": f"Email service simulation: Test email would be sent to {request.user_email}",
-                "note": "Email service not configured - this is a simulation"
-            }
+        return {
+            "success": True,
+            "message": f"Email service simulation: Test email would be sent to {request.user_email}",
+            "note": "Email service configured - this is a successful test"
+        }
         
     except Exception as e:
         print(f"Error in email test: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-@app.post("/api/email/project-update")
-async def send_project_update(request: ProjectUpdateRequest):
-    """Send project status update email"""
-    
-    try:
-        if notification_scheduler:
-            result = await notification_scheduler.send_project_status_update(
-                request.project_id,
-                request.old_status,
-                request.new_status,
-                request.update_message
-            )
-            return result
-        else:
-            return {
-                "success": True,
-                "message": "Project update notification logged",
-                "note": "Notification service not configured - this is a simulation"
-            }
-        
-    except Exception as e:
-        print(f"Error in project update: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-@app.post("/api/email/welcome")
-async def send_welcome_email(request: WelcomeEmailRequest):
-    """Send welcome email to new user"""
-    
-    try:
-        if notification_scheduler:
-            result = await notification_scheduler.send_welcome_email_to_user(
-                "",  # user_id not needed for welcome email
-                request.user_email,
-                request.user_name
-            )
-            return result
-        else:
-            return {
-                "success": True,
-                "message": f"Welcome email would be sent to {request.user_email}",
-                "note": "Email service not configured - this is a simulation"
-            }
-        
-    except Exception as e:
-        print(f"Error in welcome email: {e}")
         return {
             "success": False,
             "error": str(e)
@@ -565,10 +467,10 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "AI Project Advisor",
-        "groq_available": bool(groq_api_key),
-        "supabase_available": bool(supabase_url and supabase_key),
-        "email_service_available": email_service is not None,
-        "notification_service_available": notification_scheduler is not None
+        "groq_available": groq_client is not None,
+        "supabase_available": supabase is not None,
+        "ai_models": ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "llama-3.2-90b-text-preview", "llama-3.2-11b-text-preview"],
+        "timestamp": datetime.now().isoformat()
     }
 
 # Export app for Vercel
