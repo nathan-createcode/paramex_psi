@@ -504,7 +504,7 @@ async def analyze_project_decision(request: dict):
         
         # Use Groq for intelligent analysis
         try:
-            response = client.chat.completions.create(
+            response = groq_client.client.chat.completions.create(
                 model="mixtral-8x7b-32768",
                 messages=[
                     {"role": "system", "content": "You are a senior business advisor with expertise in freelance project management and business development. Provide structured, actionable advice."},
@@ -689,7 +689,7 @@ async def generate_dashboard_summary(request: dict):
         
         # Use Groq for intelligent summary
         try:
-            response = client.chat.completions.create(
+            response = groq_client.client.chat.completions.create(
                 model="mixtral-8x7b-32768",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that explains data in simple, friendly language. Keep responses concise and conversational."},
