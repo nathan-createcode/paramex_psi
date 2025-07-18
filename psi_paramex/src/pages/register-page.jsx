@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/supabase";
 import gambarRegister from "../assets/gambar_register.png";
 
 const RegisterPage = () => {
+  const navigate = useNavigate();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -41,7 +43,6 @@ const RegisterPage = () => {
     const intlPhone = convertToIntlPhone(phone);
 
     try {
-      // 1. Sign up user dengan Supabase Auth
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -49,7 +50,7 @@ const RegisterPage = () => {
           data: {
             full_name: name.trim(),
             phone: intlPhone,
-            display_name: name.trim()
+            display_name: name.trim(),
           },
           emailRedirectTo: `${window.location.origin}/dashboard`,
         },
@@ -59,10 +60,9 @@ const RegisterPage = () => {
         throw signUpError;
       }
 
-      // 2. Jika sign up berhasil, insert data ke tabel users
       if (authData?.user) {
         const { error: insertError } = await supabase
-          .from('users')
+          .from("users")
           .insert([
             {
               user_id: authData.user.id,
@@ -70,36 +70,30 @@ const RegisterPage = () => {
               email: email.trim(),
               phone_number: intlPhone,
               created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
+              updated_at: new Date().toISOString(),
+            },
           ]);
 
         if (insertError) {
-          console.error('Error inserting user data:', insertError);
-          // Tidak throw error karena auth sudah berhasil
-          // User tetap bisa login meski data tidak tersimpan di tabel users
+          console.error("Error inserting user data:", insertError);
         }
       }
 
       setSuccessMessage(
-        "Pendaftaran berhasil! Silakan cek email Anda untuk konfirmasi. " +
-        "Setelah konfirmasi, Anda dapat login menggunakan email dan password."
+        "Pendaftaran berhasil! Silakan cek email Anda untuk konfirmasi. Setelah konfirmasi, Anda dapat login menggunakan email dan password."
       );
-      
-      // Reset form
+
       setName("");
       setEmail("");
       setPhone("");
       setPassword("");
 
-      // Redirect ke login setelah 4 detik
       setTimeout(() => {
         window.location.href = "/login";
       }, 4000);
-
     } catch (error) {
-      console.error('Registration error:', error);
-      
+      console.error("Registration error:", error);
+
       if (error.message.includes("Database error")) {
         setError("Terjadi kesalahan pada database. Silakan coba lagi nanti.");
       } else if (error.message.includes("User already registered")) {
@@ -117,7 +111,15 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-white flex flex-col lg:flex-row relative">
+      {/* Tombol kembali ke landing */}
+      <button
+  onClick={() => navigate("/")}
+  className="absolute top-4 left-4 px-4 py-1.5 text-sm text-white font-medium rounded-md bg-black hover:bg-gray-800 transition"
+>
+  ← Landing Page
+</button>
+
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-white">
         <img
           src={gambarRegister}
@@ -129,9 +131,7 @@ const RegisterPage = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 md:px-12 lg:px-24 py-12">
         <div className="w-full max-w-md">
           <h1 className="text-3xl font-bold mb-2 text-gray-800">Create new account</h1>
-          <p className="text-gray-600 mb-6 text-sm">
-            Sign up to start managing your project
-          </p>
+          <p className="text-gray-600 mb-6 text-sm">Sign up to start managing your project</p>
 
           {error && (
             <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4">
@@ -191,7 +191,6 @@ const RegisterPage = () => {
                 className="w-full px-5 py-2 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
                 required
               />
-            
             </div>
 
             <div className="mb-4">
@@ -225,7 +224,6 @@ const RegisterPage = () => {
                 Login
               </Link>
             </p>
-            
           </div>
         </div>
       </div>
