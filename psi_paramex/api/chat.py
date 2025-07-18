@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import os
 from mangum import Mangum
+from groq_client import GroqLlamaClient
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -76,15 +77,29 @@ async def chat_endpoint(request: ChatRequest):
     """AI Chat endpoint for project advisor"""
     
     try:
-        # For now, use simple responses
-        # In production, you can integrate with Groq API if available
+        # Try to use Groq API if available
         if groq_api_key:
-            # Try to use Groq API here
-            # For now, fallback to simple response
-            pass
-        
-        response = generate_simple_response(request.message)
-        return ChatResponse(response=response, status="success")
+            try:
+                # Initialize Groq client
+                groq_client = GroqLlamaClient(performance_mode="balanced")
+                
+                # Get AI response using Groq
+                response = await groq_client.get_project_advice(
+                    user_message=request.message,
+                    conversation_history=[msg.dict() for msg in request.conversation_history] if request.conversation_history else []
+                )
+                
+                return ChatResponse(response=response, status="success")
+                
+            except Exception as groq_error:
+                print(f"Groq API error: {groq_error}")
+                # Fall back to simple response if Groq fails
+                response = generate_simple_response(request.message)
+                return ChatResponse(response=response, status="success")
+        else:
+            # No Groq API key, use simple response
+            response = generate_simple_response(request.message)
+            return ChatResponse(response=response, status="success")
         
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
