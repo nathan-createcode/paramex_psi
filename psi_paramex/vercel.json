@@ -1,23 +1,22 @@
 {
   "functions": {
-    "api/chat.py": {
-      "runtime": "python3.9",
-      "maxDuration": 30
+    "api/index.py": {
+      "runtime": "python3.12"
     },
     "api/hello.py": {
-      "runtime": "python3.9"
+      "runtime": "python3.12"
     },
     "api/debug.py": {
-      "runtime": "python3.9"
+      "runtime": "python3.12"
     },
     "api/test.py": {
-      "runtime": "python3.9"
+      "runtime": "python3.12"
     }
   },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/chat.py"
+      "destination": "/api/index.py"
     }
   ]
 } 

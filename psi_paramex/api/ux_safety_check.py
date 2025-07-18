@@ -232,4 +232,7 @@ class UXSafetyChecker:
         if len(unique_topics) > 3:
             recommendations.append("You're covering many topics - consider focusing on one challenge at a time")
         
-        return recommendations 
+        return recommendations
+
+# Global instance
+ux_safety_checker = UXSafetyChecker()
