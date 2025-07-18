@@ -2,7 +2,6 @@
 
 import { useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
-import { useSettings } from "../contexts/SettingsContext"
 import { useState, useEffect, useRef } from "react"
 import {
   Settings,
@@ -19,7 +18,6 @@ import logo from "../assets/logo.png"
 const Sidebar = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { t } = useSettings()
 
   const [user, setUser] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -41,7 +39,7 @@ const Sidebar = () => {
 
   const navItems = [
     {
-      name: t('dashboard'),
+      name: "Dashboard",
       href: "/dashboard",
       icon: LayoutDashboard,
     },
@@ -51,7 +49,7 @@ const Sidebar = () => {
       icon: ClipboardCheck,
     },
     {
-      name: t('dss'),
+      name: "DSS",
       href: "/dss",
       icon: BrainCircuit,
     },
@@ -119,13 +117,13 @@ const Sidebar = () => {
 
   const secondaryItems = [
     {
-      name: t('settings'),
+      name: "Settings",
       href: "/settings",
       icon: Settings,
       description: "App preferences, theme, notifications",
     },
     {
-      name: t('help'),
+      name: "Help",
       href: "/help",
       icon: BadgeHelp,
       description: "Documentation, support, tutorials",
@@ -220,9 +218,7 @@ const Sidebar = () => {
                 width: open ? '100%' : '0px'
               }}
             >
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0 whitespace-nowrap">
-                {t('language') === 'id' ? 'MENU UTAMA' : 'MAIN MENU'}
-              </h2>
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0 whitespace-nowrap">MAIN MENU</h2>
             </div>
           </div>
           {navItems.map((item) => {
@@ -269,9 +265,7 @@ const Sidebar = () => {
                 width: open ? '100%' : '0px'
               }}
             >
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0 whitespace-nowrap">
-                {t('language') === 'id' ? 'LAINNYA' : 'OTHER'}
-              </h2>
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider m-0 whitespace-nowrap">OTHER</h2>
             </div>
           </div>
           {secondaryItems.map((item) => {
@@ -341,7 +335,7 @@ const Sidebar = () => {
                     {getDisplayName(user)}
                   </p>
                   <p className="text-xs text-gray-500 m-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                    {t('language') === 'id' ? 'Pengembang Freelance' : 'Freelance Developer'}
+                    Freelance Developer
                   </p>
                 </div>
               </div>
@@ -358,7 +352,7 @@ const Sidebar = () => {
           style={{
             boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
           }}
-          title={!open ? t('logout') : undefined}
+          title={!open ? "Logout" : undefined}
         >
           <div className="flex-shrink-0">
             <LogOut size={20} color="#EF4444" />
@@ -369,7 +363,7 @@ const Sidebar = () => {
               width: open ? '100%' : '0px'
             }}
           >
-            <span className="text-red-700 whitespace-nowrap">{t('logout')}</span>
+            <span className="text-red-700 whitespace-nowrap">Logout</span>
           </div>
         </button>
       </div>
