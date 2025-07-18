@@ -1,16 +1,15 @@
 // API Configuration for development and production
 const API_CONFIG = {
   development: {
-    baseURL: "http://localhost:8000/api"
+    baseURL: "/api"  // Use Vercel API even in development
   },
   production: {
     baseURL: "/api"  // Vercel serverless functions
   }
 }
 
-// Get current environment
-const isDevelopment = import.meta.env.MODE === 'development'
-const currentConfig = isDevelopment ? API_CONFIG.development : API_CONFIG.production
+// Always use production API endpoints to avoid localhost issues
+const currentConfig = API_CONFIG.production
 
 export const API_BASE_URL = currentConfig.baseURL
 
@@ -52,7 +51,7 @@ export const apiCall = async (endpoint, options = {}) => {
 
 // Environment info
 export const ENV_INFO = {
-  isDevelopment,
+  isDevelopment: false, // Force production mode
   currentConfig,
-  mode: import.meta.env.MODE,
+  mode: 'production', // Force production mode
 } 
