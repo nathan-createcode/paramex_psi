@@ -80,9 +80,10 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
       try {
         const { data, error } = await supabase.from("project_status").select("*");
         if (error) throw error;
-        // Filter out "On-Discuss" status
+        // Filter out "On-Discuss" and "overdue" status
         const filteredStatuses = (data || []).filter(status => 
-          status.status_name?.toLowerCase() !== 'on-discuss'
+          status.status_name?.toLowerCase() !== 'on-discuss' &&
+          status.status_name?.toLowerCase() !== 'overdue'
         );
         setStatusOptions(filteredStatuses);
       } catch {

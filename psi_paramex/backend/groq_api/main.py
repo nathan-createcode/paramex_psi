@@ -16,7 +16,33 @@ import pytz
 from groq_client import GroqLlamaClient
 
 # Load environment variables from parent directory (psi_paramex/.env)
-load_dotenv(dotenv_path="../../.env")
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+# Try multiple locations for .env file
+env_paths = [
+    "../../.env",  # Original path
+    "../../../.env",  # One level up
+    ".env",  # Current directory
+]
+
+env_loaded = False
+for env_path in env_paths:
+    if Path(env_path).exists():
+        load_dotenv(dotenv_path=env_path)
+        print(f"✅ Environment variables loaded from: {env_path}")
+        env_loaded = True
+        break
+
+if not env_loaded:
+    print("⚠️ Warning: .env file not found in any expected location")
+    print("   Please make sure .env file exists with required variables:")
+    print("   - GROQ_API_KEY")
+    print("   - VITE_SUPABASE_URL")
+    print("   - VITE_SUPABASE_ANON_KEY")
 
 # Initialize FastAPI app
 app = FastAPI(title="ParameX PSI - AI Project Advisor API", version="1.0.0")
@@ -24,6 +50,13 @@ app = FastAPI(title="ParameX PSI - AI Project Advisor API", version="1.0.0")
 # Initialize Supabase client
 supabase_url = os.getenv("VITE_SUPABASE_URL")
 supabase_key = os.getenv("VITE_SUPABASE_ANON_KEY")
+groq_api_key = os.getenv("GROQ_API_KEY")
+
+print(f"🔍 Environment variables status:")
+print(f"   GROQ_API_KEY: {'✅ Set' if groq_api_key else '❌ Missing'}")
+print(f"   VITE_SUPABASE_URL: {'✅ Set' if supabase_url else '❌ Missing'}")
+print(f"   VITE_SUPABASE_ANON_KEY: {'✅ Set' if supabase_key else '❌ Missing'}")
+
 supabase: Client = None
 notification_scheduler = None
 email_service = None
@@ -33,6 +66,13 @@ try:
         supabase = create_client(supabase_url, supabase_key)
         print("✅ Supabase client initialized successfully")
         
+        # Test database connection
+        try:
+            test_response = supabase.table("projects").select("count", count="exact").limit(1).execute()
+            print(f"✅ Database connection test successful")
+        except Exception as db_error:
+            print(f"⚠️ Database connection test failed: {db_error}")
+        
         # Initialize email service
         email_service = SupabaseEmailService(supabase)
         print("✅ Email service initialized successfully")
@@ -40,12 +80,23 @@ try:
         # Initialize notification scheduler
         notification_scheduler = NotificationScheduler(supabase, email_service)
         print("✅ Notification scheduler initialized successfully")
+    else:
+        print("❌ Supabase credentials missing - project context features will be disabled")
 except Exception as e:
     print(f"⚠️ Warning: Could not initialize Supabase client: {e}")
     print("Project context features will be disabled")
 
 # Initialize optimized Groq client with balanced performance
-groq_client = GroqLlamaClient(performance_mode="balanced")  # Better for project context analysis
+groq_client = None
+try:
+    if groq_api_key:
+        groq_client = GroqLlamaClient(performance_mode="balanced")  # Better for project context analysis
+        print("✅ Groq AI client initialized successfully")
+    else:
+        print("❌ GROQ_API_KEY missing - AI features will be disabled")
+except Exception as e:
+    print(f"⚠️ Warning: Could not initialize Groq client: {e}")
+    print("AI features will be disabled")
 
 # Configure CORS
 app.add_middleware(
@@ -181,15 +232,18 @@ async def chat_with_advisor(request: ChatRequest):
         project_keywords = [
             "project", "deadline", "workload", "client", "status", "timeline", 
             "progress", "task", "work", "busy", "schedule", "priority", "urgent",
-            "review", "current", "ongoing", "active", "completed", "finished"
+            "review", "current", "ongoing", "active", "completed", "finished",
+            "saya", "ku", "my", "what", "how", "when", "which", "where",
+            "bagaimana", "apa", "kapan", "mana", "siapa", "berapa"
         ]
         
         # Check if user is asking about projects (more flexible detection)
         should_fetch_projects = (
             request.user_id and supabase and 
             (any(keyword in request.message.lower() for keyword in project_keywords) or
-             len(request.message.split()) <= 3 or  # Short questions often about status
-             "?" in request.message)  # Questions often need project context
+             len(request.message.split()) <= 5 or  # Short questions often about status
+             "?" in request.message or  # Questions often need project context
+             len(request.message) < 50)  # Short messages often need context
         )
         
         if should_fetch_projects:
@@ -280,8 +334,45 @@ async def chat_with_advisor(request: ChatRequest):
         # Include project context if available and relevant
         if project_context.strip():
             enhanced_message += f"\n\n[Project Status: {project_context.strip()}]"
+            
+        # ALWAYS include full project data if available for better AI understanding
+        if should_fetch_projects:
+            try:
+                projects_response = await get_user_projects(request.user_id)
+                if projects_response.get("projects") and len(projects_response["projects"]) > 0:
+                    projects = projects_response["projects"]
+                    
+                    # Add detailed project information to the message
+                    project_details = "\n\n[USER'S PROJECT DATA]:\n"
+                    for i, project in enumerate(projects[:10], 1):  # Limit to 10 projects
+                        project_details += f"{i}. {project['name']} - {project['client']}\n"
+                        project_details += f"   Status: {project['status']}, Deadline: {project['deadline']}\n"
+                        project_details += f"   Payment: ${project['payment']:,}, Type: {project['type']}\n"
+                        project_details += f"   Difficulty: {project['difficulty']}\n\n"
+                    
+                    enhanced_message += project_details
+                    print(f"✅ Added detailed project data to AI prompt ({len(projects)} projects)")
+                else:
+                    enhanced_message += "\n\n[USER'S PROJECT DATA]: No projects found in database."
+                    print(f"📭 No projects found for user context")
+            except Exception as e:
+                print(f"❌ Failed to get detailed project data: {str(e)}")
+                enhanced_message += f"\n\n[PROJECT DATA ERROR]: Could not retrieve project details from database."
         
         print(f"🤖 Sending message to AI: {request.message[:100]}...")
+        print(f"🔍 Enhanced message length: {len(enhanced_message)} characters")
+        
+        # Debug: Show what's being sent to AI
+        if "[USER'S PROJECT DATA]" in enhanced_message:
+            print(f"✅ Project data included in AI prompt")
+        else:
+            print(f"❌ No project data in AI prompt")
+            
+        # Check if Groq client is available
+        if not groq_client:
+            return ChatResponse(
+                response="I apologize, but the AI service is currently unavailable. Please make sure the GROQ_API_KEY is configured correctly and the backend server is running properly."
+            )
         
         # Get AI response from Groq with enhanced project context
         ai_response = await groq_client.get_project_advice(

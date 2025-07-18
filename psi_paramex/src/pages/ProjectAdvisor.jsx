@@ -465,14 +465,33 @@ const ProjectAdvisor = () => {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        let errorMessage = `HTTP error! status: ${response.status}`
+        try {
+          const errorData = await response.json()
+          if (errorData.error) {
+            errorMessage = errorData.error.message || errorData.error
+          }
+        } catch {
+          // If we can't parse the error response, use the status code
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
       return data.response
     } catch (error) {
       console.error('Error calling AI API:', error)
-      return "I apologize, but I'm currently unable to connect to my AI brain. Please check that the backend server is running and try again. In the meantime, I recommend breaking your project into smaller, manageable tasks for better organization."
+      
+      // More specific error messages based on the error type
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        return "I'm having trouble connecting to the AI server. Please make sure the backend server is running on localhost:8000 and try again."
+      } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+        return "The AI server is experiencing technical difficulties. This might be due to:\n\n• Groq API issues\n• Server configuration problems\n• Database connection issues\n\nPlease try again in a few moments. If the problem persists, check the backend server logs for more details."
+      } else if (error.message.includes('404')) {
+        return "The AI chat endpoint is not available. Please make sure the backend server is running with the correct API endpoints."
+      } else {
+        return `I apologize, but I'm experiencing technical difficulties. Error: ${error.message}\n\nPlease try again later or check if the backend server is running properly.`
+      }
     }
   }
 
