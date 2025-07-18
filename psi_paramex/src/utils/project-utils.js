@@ -36,7 +36,11 @@ export const filterProjects = (projects, searchQuery, filters) => {
       project.client.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus =
-      filters.status === 'all' || project.status === filters.status;
+      filters.status === 'all'
+        ? true
+        : filters.status === 'To Do'
+        ? ['On-Plan', 'On-Process', 'Overdue'].includes(project.status)
+        : project.status === filters.status;
 
     const matchesDifficulty =
       filters.difficulty === 'all' || project.difficulty === filters.difficulty;
@@ -50,6 +54,7 @@ export const filterProjects = (projects, searchQuery, filters) => {
     );
   });
 };
+
 
 /**
  * Check if a project's deadline matches the filter

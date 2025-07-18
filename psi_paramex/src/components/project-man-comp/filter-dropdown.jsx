@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 
 export default function FilterDropdown({
-  label,
   options,
   value,
   onChange,

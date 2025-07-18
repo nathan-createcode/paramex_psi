@@ -22,13 +22,13 @@ const Sidebar = () => {
 
   const [user, setUser] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
-  
+
   // Manage sidebar state internally with localStorage persistence
   const [open, setOpen] = useState(() => {
     const savedState = localStorage.getItem('sidebarOpen')
     return savedState !== null ? JSON.parse(savedState) : true // default to true if no saved state
   })
-  
+
   const prevOpen = useRef(open)
 
   // Save sidebar state to localStorage whenever it changes
@@ -46,6 +46,7 @@ const Sidebar = () => {
     },
     {
       name: t('projects'),
+      name: "Projects Management",
       href: "/projects",
       icon: ClipboardCheck,
     },
@@ -171,7 +172,7 @@ const Sidebar = () => {
                 className="w-full h-full object-contain brightness-0 invert"
               />
             </div>
-            <div 
+            <div
               className="overflow-hidden transition-all duration-300 ease-in-out"
               style={{
                 width: open ? '120px' : '0px'
@@ -213,7 +214,7 @@ const Sidebar = () => {
       <nav className="flex-1 p-4 flex flex-col gap-6 overflow-y-auto">
         <div className="flex flex-col gap-1">
           <div className="p-3">
-            <div 
+            <div
               className="overflow-hidden transition-all duration-300 ease-in-out"
               style={{
                 width: open ? '100%' : '0px'
@@ -246,7 +247,7 @@ const Sidebar = () => {
                 <div className="flex-shrink-0">
                   <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
                 </div>
-                <div 
+                <div
                   className="overflow-hidden transition-all duration-300 ease-in-out flex-1"
                   style={{
                     width: open ? '100%' : '0px'
@@ -262,7 +263,7 @@ const Sidebar = () => {
         {/* Secondary Navigation */}
         <div className="flex flex-col gap-1">
           <div className="p-3">
-            <div 
+            <div
               className="overflow-hidden transition-all duration-300 ease-in-out"
               style={{
                 width: open ? '100%' : '0px'
@@ -295,7 +296,7 @@ const Sidebar = () => {
                 <div className="flex-shrink-0">
                   <IconComponent size={20} color={active ? "#3B82F6" : "currentColor"} />
                 </div>
-                <div 
+                <div
                   className="overflow-hidden transition-all duration-300 ease-in-out flex-1"
                   style={{
                     width: open ? '100%' : '0px'
@@ -313,7 +314,7 @@ const Sidebar = () => {
 
         {/* User Info Card */}
         <div className="pt-6">
-          <div 
+          <div
             className="overflow-hidden transition-all duration-300 ease-in-out"
             style={{
               width: open ? '100%' : '0px'
@@ -362,7 +363,7 @@ const Sidebar = () => {
           <div className="flex-shrink-0">
             <LogOut size={20} color="#EF4444" />
           </div>
-          <div 
+          <div
             className="overflow-hidden transition-all duration-300 ease-in-out"
             style={{
               width: open ? '100%' : '0px'

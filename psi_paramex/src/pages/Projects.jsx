@@ -306,7 +306,7 @@ export default function ProjectManagementPage() {
                 client_name: formData.client,
                 start_date: formData.startDate,
                 deadline: formData.deadline,
-                payment_amount: Math.min(parseFloat(formData.payment) || 0, 2147483647),
+                payment_amount: Math.min(parseInt(formData.payment) || 0, 2147483647),
                 difficulty_level: formData.difficulty,
                 type_id: formData.type,
                 status_id: formData.status,
@@ -369,7 +369,7 @@ export default function ProjectManagementPage() {
                   client_name: formData.client,
                   start_date: formData.startDate,
                   deadline: formData.deadline,
-                  payment_amount: Math.min(parseFloat(formData.payment) || 0, 2147483647),
+                  payment_amount: Math.min(parseInt(formData.payment) || 0, 2147483647),
                   difficulty_level: formData.difficulty,
                   type_id: formData.type,
                   status_id: formData.status,
@@ -392,7 +392,7 @@ export default function ProjectManagementPage() {
 
       {contextMenu.visible && (
         <div
-          className="absolute z-[70] bg-white border border-gray-100 rounded-lg shadow-md w-36"
+          className="absolute z-50 bg-white border border-gray-100 rounded-lg shadow-md w-36"
           style={{
             top: contextMenu.y,
             left: contextMenu.x,

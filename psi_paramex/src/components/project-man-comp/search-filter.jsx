@@ -11,7 +11,7 @@ export default function SearchAndFilters({
   onAddProject,
 }) {
   // const navigate = useNavigate();
-  const statusOptions = ["all", "On-Process", "On-Plan", "Done"];
+  const statusOptions = ["To Do", "On-Plan", "On-Process",  "Done", "all"];
   const difficultyOptions = ["all", "Low", "Medium", "High"];
   const deadlineOptions = [
     "all",
