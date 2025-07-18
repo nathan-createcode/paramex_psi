@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
-import { useSettings } from "../contexts/SettingsContext"
 import Layout from "../components/Layout"
 import {
   Chart as ChartJS,
@@ -20,8 +19,6 @@ import {
 } from "chart.js"
 import { Line, Bar, Doughnut } from "react-chartjs-2"
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns"
-import { ChevronDown } from "lucide-react"
-import Dropdown from "../components/ui/dropdown"
 
 // Register Chart.js components including Filler
 ChartJS.register(
@@ -37,22 +34,23 @@ ChartJS.register(
   Filler,
 )
 
-// Project type mapping sesuai database
-const projectTypeMapping = {
-  1: "Website",
-  2: "Foto",
-  3: "Video",
-  4: "Game",
-  5: "Mobile Development",
-}
+// // Project type mapping sesuai database
+// const projectTypeMapping = {
+//   1: "Website",
+//   2: "Foto",
+//   3: "Video",
+//   4: "Game",
+//   5: "Mobile Development",
+// }
 
-const projectTypeColors = {
-  1: "#3B82F6", // Website - Blue
-  2: "#10B981", // Foto - Green
-  3: "#F59E0B", // Video - Yellow
-  4: "#8B5CF6", // Game - Purple
-  5: "#EF4444", // Mobile Development - Red
-}
+
+// const projectTypeColors = {
+//   1: "#3B82F6", // Website - Blue
+//   2: "#10B981", // Foto - Green
+//   3: "#F59E0B", // Video - Yellow
+//   4: "#8B5CF6", // Game - Purple
+//   5: "#EF4444", // Mobile Development - Red
+// }
 
 // Chart options
 const chartOptions = {
@@ -104,7 +102,7 @@ const chartOptions = {
 }
 
 // Specific options for Project Types Chart (with enhanced tooltip)
-const createTypesChartOptions = (t) => ({
+const typesChartOptions = {
   ...chartOptions,
   animation: {
     easing: 'easeInOutQuart', // Smoother easing
@@ -121,13 +119,10 @@ const createTypesChartOptions = (t) => ({
       ...chartOptions.plugins.tooltip,
       callbacks: {
         label: (context) => {
-          const projectsText = t('language') === 'id' ? 'proyek' : 'projects'
-          return `${context.label}: ${context.parsed.y} ${projectsText}`;
+          return `${context.label}: ${context.parsed.y} projects`;
         },
         afterBody: () => {
-          return t('language') === 'id' ? 
-            'Tampilan Terfilter: Hanya menampilkan proyek dalam periode waktu yang dipilih' :
-            'Filtered View: Shows only projects in selected time period';
+          return 'Filtered View: Shows only projects in selected time period';
         },
       },
     },
@@ -143,27 +138,18 @@ const createTypesChartOptions = (t) => ({
       },
     },
   },
-})
+}
 
 // Specific options for Earnings Chart (without legend)
-const createEarningsChartOptions = (formatCurrency) => ({
+const earningsChartOptions = {
   ...chartOptions,
   plugins: {
     ...chartOptions.plugins,
     legend: {
       display: false, // Hide legend for earnings chart
     },
-    tooltip: {
-      ...chartOptions.plugins.tooltip,
-      callbacks: {
-        label: (context) => {
-          const value = context.parsed.y
-          return `Earnings: ${formatCurrency(value, true)}`
-        },
-      },
-    },
   },
-})
+}
 
 // Icon Components dengan warna
 const BarChart3Icon = ({ color = "#3B82F6" }) => (
@@ -230,7 +216,6 @@ const Dashboard = () => {
   const [error, setError] = useState(null)
   const [timeFilter, setTimeFilter] = useState("all")
   const navigate = useNavigate()
-  const { formatCurrency: globalFormatCurrency, t } = useSettings()
 
   // Authentication check
   useEffect(() => {
@@ -318,10 +303,7 @@ const Dashboard = () => {
     console.log("Done projects:", doneProjects)
     console.log("Done projects payment amounts:", doneProjects.map(p => p.payment_amount))
     
-    const totalEarnings = doneProjects.reduce((sum, p) => {
-      const payment = Number(p.payment_amount) || 0
-      return sum + payment
-    }, 0)
+    const totalEarnings = doneProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0)
     console.log("Total earnings:", totalEarnings)
 
     // Calculate this month's earnings
@@ -335,10 +317,7 @@ const Dashboard = () => {
           projectDate.getFullYear() === thisMonth.getFullYear()
         )
       })
-      .reduce((sum, p) => {
-        const payment = Number(p.payment_amount) || 0
-        return sum + payment
-      }, 0)
+      .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
 
     console.log("Monthly earnings:", monthlyEarnings)
 
@@ -354,19 +333,23 @@ const Dashboard = () => {
 
   // Filter projects by selected time filter
   const filteredProjects = useMemo(() => {
-    if (timeFilter === "all") return projects
-
-    const monthsAgo = Number.parseInt(timeFilter)
-    const filterDate = new Date()
-    filterDate.setMonth(filterDate.getMonth() - monthsAgo)
-    const startOfFilterMonth = new Date(filterDate.getFullYear(), filterDate.getMonth(), 1)
-    const endOfFilterMonth = new Date(filterDate.getFullYear(), filterDate.getMonth() + 1, 0)
-
+    if (timeFilter === "all") return projects;
+  
+    const monthsAgo = parseInt(timeFilter, 10);
+    const targetMonth = subMonths(new Date(), monthsAgo);
+    const start = startOfMonth(targetMonth);
+    const end = endOfMonth(targetMonth);
+  
+    console.log(`🕒 Filtering for: ${monthsAgo} month(s) ago`);
+    console.log("Start of month:", start.toISOString());
+    console.log("End of month:", end.toISOString());
+  
     return projects.filter((project) => {
-      const projectDate = new Date(project.created_at)
-      return projectDate >= startOfFilterMonth && projectDate <= endOfFilterMonth
-    })
-  }, [projects, timeFilter])
+      const projectDate = new Date(project.start_date);
+      return isWithinInterval(projectDate, { start, end });
+    });
+  }, [projects, timeFilter]);
+  
 
   // Generate breakdown data for tooltip
   const statusBreakdownData = useMemo(() => {
@@ -560,10 +543,7 @@ const Dashboard = () => {
 
       return {
         month,
-        earnings: completedProjects.reduce((sum, p) => {
-          const payment = Number(p.payment_amount) || 0
-          return sum + payment
-        }, 0),
+        earnings: completedProjects.reduce((sum, p) => sum + (p.payment_amount || 0), 0),
       }
     })
 
@@ -571,7 +551,7 @@ const Dashboard = () => {
       labels: monthlyEarningsData.map((d) => d.month),
       datasets: [
         {
-          label: "Earnings",
+          label: "Earnings ($)",
           data: monthlyEarningsData.map((d) => d.earnings),
           borderColor: "#10B981",
           backgroundColor: "rgba(16, 185, 129, 0.1)",
@@ -587,9 +567,9 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[70vh]">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading dashboard...</p>
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+          <p>Loading dashboard...</p>
         </div>
       </Layout>
     )
@@ -598,12 +578,12 @@ const Dashboard = () => {
   if (error) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Dashboard</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+          <h2>Error Loading Dashboard</h2>
+          <p>{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-blue-500 text-white border-none rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+            className="px-6 py-3 mt-4 bg-blue-500 text-white border-none rounded-lg cursor-pointer"
           >
             Retry
           </button>
@@ -619,50 +599,178 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto">
         {/* Dynamic Welcome Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('dashboard')} Overview</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
           <p className="text-lg text-gray-600 leading-relaxed">
-            {t('welcomeBack')}, {user?.user_metadata?.full_name || user?.email}! You have{" "}
+            Welcome back, {user?.user_metadata?.full_name || user?.email}! You have{" "}
             <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg" >
-              {summary.totalProjects} {t('projects').toLowerCase()}
+              {summary.totalProjects} projects
             </span>
             ,{" "}
             <span className="font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
-              {summary.onProcess} {t('inProgress').toLowerCase()}
+              {summary.onProcess} in progress
             </span>
             , and earned{" "}
             <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-              {globalFormatCurrency(summary.monthlyEarnings, true)} {t('thisMonth').toLowerCase()}
+              ${summary.monthlyEarnings.toLocaleString()} this month
             </span>
             .
           </p>
         </div>
 
-        {/* Summary Cards - 5 Cards dengan responsive grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+        {/* Project Summary & Insights Dashboard */}
+        <div className="mb-8">
+          <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              Project Summary & Insights
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Success Rate */}
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">Success Rate</span>
+                  <CheckCircleIcon color="#6B7280" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">
+                  {summary.totalProjects > 0 ? Math.round((summary.done / summary.totalProjects) * 100) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">
+                  {summary.done} of {summary.totalProjects} completed
+                </div>
+              </div>
+              
+              {/* Monthly Income */}
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">Monthly Income</span>
+                  <DollarSignIcon color="#6B7280" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">
+                  ${Math.round(summary.totalEarnings / Math.max(1, 6)).toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-600">
+                  Average last 6 months
+                </div>
+              </div>
+              
+              {/* Active Projects */}
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">Active Projects</span>
+                  <ClockIcon color="#6B7280" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">
+                  {summary.onPlan + summary.onProcess}
+                </div>
+                <div className="text-xs text-gray-600">
+                  Need your attention
+                </div>
+              </div>
+              
+              {/* Growth Trend */}
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">Growth Trend</span>
+                  <TrendingUpIcon color="#6B7280" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">
+                  {(() => {
+                    const thisMonth = new Date();
+                    const lastMonth = new Date(thisMonth.getFullYear(), thisMonth.getMonth() - 1, 1);
+                    const thisMonthProjects = projects.filter(p => {
+                      const projectDate = new Date(p.created_at);
+                      return projectDate.getMonth() === thisMonth.getMonth() && 
+                             projectDate.getFullYear() === thisMonth.getFullYear();
+                    }).length;
+                    const lastMonthProjects = projects.filter(p => {
+                      const projectDate = new Date(p.created_at);
+                      return projectDate.getMonth() === lastMonth.getMonth() && 
+                             projectDate.getFullYear() === lastMonth.getFullYear();
+                    }).length;
+                    const growth = lastMonthProjects > 0 ? 
+                      Math.round(((thisMonthProjects - lastMonthProjects) / lastMonthProjects) * 100) : 0;
+                    return growth > 0 ? `+${growth}%` : `${growth}%`;
+                  })()}
+                </div>
+                <div className="text-xs text-gray-600">
+                  vs last month
+                </div>
+              </div>
+              
+              {/* Earning Potential */}
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">Earning Potential</span>
+                  <DollarSignIcon color="#6B7280" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">
+                  ${projects
+                    .filter(p => p.status === "On-Plan" || p.status === "On-Process")
+                    .reduce((sum, p) => sum + (p.payment_amount || 0), 0)
+                    .toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-600">
+                  Value in active projects
+                </div>
+              </div>
+              
+              {/* Best Performing Type */}
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">Best Performer</span>
+                  <TrendingUpIcon color="#6B7280" />
+                </div>
+                <div className="text-lg font-bold text-gray-900 mb-1">
+                  {(() => {
+                    const typeStats = projects.reduce((acc, p) => {
+                      if (p.status === "Done") {
+                        const type = p.project_type || "Unknown";
+                        acc[type] = (acc[type] || 0) + (p.payment_amount || 0);
+                      }
+                      return acc;
+                    }, {});
+                    
+                    const bestType = Object.entries(typeStats).reduce((a, b) => 
+                      typeStats[a[0]] > typeStats[b[0]] ? a : b, ["No data", 0]
+                    );
+                    
+                    return bestType[0] !== "No data" ? bestType[0] : "No data";
+                  })()}
+                </div>
+                <div className="text-xs text-gray-600">
+                  Highest revenue type
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary Cards - 6 Cards seperti di gambar */}
+        <div className="grid grid-cols-5 xl:grid-cols-5 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4 mb-8">
           {[
             {
-              title: t('totalProjects'),
+              title: "Total Projects",
               value: summary.totalProjects.toString(),
               icon: BarChart3Icon,
               iconColor: "#3B82F6",
               bgColor: "bg-blue-50",
             },
             {
-              title: t('planning'),
+              title: "On-Plan",
               value: summary.onPlan.toString(),
               icon: ClockIcon,
               iconColor: "#3B82F6",
               bgColor: "bg-blue-50",
             },
             {
-              title: t('inProgress'),
+              title: "On-Process",
               value: summary.onProcess.toString(),
               icon: TrendingUpIcon,
               iconColor: "#EAB308",
               bgColor: "bg-yellow-50",
             },
             {
-              title: t('completed'),
+              title: "Done",
               value: summary.done.toString(),
               icon: CheckCircleIcon,
               iconColor: "#10B981",
@@ -670,8 +778,7 @@ const Dashboard = () => {
             },
             {
               title: "Total Earnings",
-              value: globalFormatCurrency(summary.totalEarnings, true),
-              fullValue: globalFormatCurrency(summary.totalEarnings),
+              value: `$${summary.totalEarnings.toLocaleString()}`,
               icon: DollarSignIcon,
               iconColor: "#10B981",
               bgColor: "bg-green-50",
@@ -679,15 +786,14 @@ const Dashboard = () => {
           ].map((item, index) => (
             <div
               key={index}
-              className="bg-white rounded-2xl p-6 flex items-center gap-4 shadow-md/5 transition-all duration-200 border border-gray-100 cursor-default min-w-0"
-              title={item.fullValue || item.value}
+              className="bg-white rounded-2xl p-6 flex items-center gap-4 shadow-md/5 transition-all duration-200 border border-gray-100 cursor-default"
             > 
-              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${item.bgColor} flex-shrink-0`}>
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${item.bgColor}`}>
                 <item.icon color={item.iconColor} />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 mb-1 truncate">{item.title}</p>
-                <h3 className="text-xl lg:text-2xl font-bold text-gray-900 truncate">{item.value}</h3>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600 mb-1">{item.title}</p>
+                <h3 className="text-2xl font-bold text-gray-900">{item.value}</h3>
               </div>
             </div>
           ))}
@@ -698,33 +804,29 @@ const Dashboard = () => {
           <div className="flex flex-row gap-4 items-center justify-between mb-6 flex-wrap">
             <div className="flex items-center gap-2">
               <FilterIcon />
-              <h2 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Analitik Terfilter' : 'Filtered Analytics'}</h2>
+              <h2 className="text-xl font-bold text-gray-900">Filtered Analytics</h2>
             </div>
-            <div className="relative">
-              <Dropdown
-                value={timeFilter}
-                onChange={(value) => setTimeFilter(value)}
-                options={[
-                  { value: "all", label: t('language') === 'id' ? "Semua Waktu" : "All Time" },
-                  { value: "0", label: t('thisMonth') },
-                  { value: "1", label: t('language') === 'id' ? "Bulan Lalu" : "Last Month" },
-                  { value: "2", label: t('language') === 'id' ? "2 Bulan Lalu" : "2 Months Ago" },
-                  { value: "3", label: t('language') === 'id' ? "3 Bulan Lalu" : "3 Months Ago" }
-                ]}
-                placeholder={t('language') === 'id' ? "Pilih periode waktu" : "Select time period"}
-                className="min-w-[180px]"
-              />
-            </div>
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+              className="px-4 py-2 rounded-xl border border-gray-100 bg-white shadow-sm text-sm cursor-pointer outline-none"
+            >
+              <option value="all">All Time</option>
+              <option value="0">This Month</option>
+              <option value="1">Last Month</option>
+              <option value="2">2 Months Ago</option>
+              <option value="3">3 Months Ago</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Status Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">{t('status')} {t('projects')}</h3>
+                <h3 className="text-xl font-bold text-gray-900">Project Status</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
                   <FilterIcon />
-                  <span>{t('language') === 'id' ? 'Terfilter' : 'Filtered'}</span>
+                  <span>Filtered</span>
                 </div>
               </div>
               <div className="h-64 relative">
@@ -735,19 +837,19 @@ const Dashboard = () => {
             {/* Project Types Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Tipe Proyek' : 'Project Types'}</h3>
+                <h3 className="text-xl font-bold text-gray-900">Project Types</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
                   <FilterIcon />
-                  <span>{t('language') === 'id' ? 'Terfilter' : 'Filtered'}</span>
+                  <span>Filtered</span>
                 </div>
               </div>
               <div className="h-64 relative">
                 {typesData.labels.length > 0 ? (
-                  <Bar data={typesData} options={createTypesChartOptions(t)} />
+                  <Bar data={typesData} options={typesChartOptions} />
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     <div className="text-4xl mb-2">📊</div>
-                    <p className="text-sm">{t('language') === 'id' ? 'Tidak ada proyek di periode waktu yang dipilih' : 'No projects in selected time period'}</p>
+                    <p className="text-sm">No projects in selected time period</p>
                   </div>
                 )}
               </div>
@@ -759,17 +861,17 @@ const Dashboard = () => {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-6">
             <GlobeIcon />
-            <h2 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Performa Keseluruhan' : 'Overall Performance'}</h2>
+            <h2 className="text-xl font-bold text-gray-900">Overall Performance</h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Trends Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Tren Proyek' : 'Project Trends'}</h3>
+                <h3 className="text-xl font-bold text-gray-900">Project Trends</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
                   <GlobeIcon />
-                  <span>{t('language') === 'id' ? 'Tampilan Global' : 'Global View'}</span>
+                  <span>Global View</span>
                 </div>
               </div>
               <div className="h-64 relative">
@@ -780,14 +882,14 @@ const Dashboard = () => {
             {/* Earnings Chart */}
             <div className="bg-white rounded-3xl p-6 shadow-md/5 border border-gray-100 relative">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">{t('language') === 'id' ? 'Pendapatan Bulanan' : 'Monthly Earnings'}</h3>
+                <h3 className="text-xl font-bold text-gray-900">Monthly Earnings</h3>
                 <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-2xl text-xs font-medium">
                   <GlobeIcon />
-                  <span>{t('language') === 'id' ? 'Tampilan Global' : 'Global View'}</span>
+                  <span>Global View</span>
                 </div>
               </div>
               <div className="h-64 relative">
-                <Line data={earningsData} options={createEarningsChartOptions(globalFormatCurrency)} />
+                <Line data={earningsData} options={earningsChartOptions} />
               </div>
             </div>
           </div>
@@ -797,15 +899,15 @@ const Dashboard = () => {
         {projects.length === 0 && (
           <div className="text-center py-15 px-5 bg-white rounded-3xl shadow-md/5 border border-gray-100 mt-8">
             <div className="text-6xl mb-4">📊</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">{t('language') === 'id' ? 'Belum Ada Proyek' : 'No Projects Yet'}</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Projects Yet</h3>
             <p className="text-base text-gray-600 mb-6">
-              {t('language') === 'id' ? 'Mulai dengan menambahkan proyek pertama Anda untuk melihat analitik dan wawasan di sini.' : 'Start by adding your first project to see analytics and insights here.'}
+              Start by adding your first project to see analytics and insights here.
             </p>
             <button
               className="px-6 py-3 bg-blue-500 text-white border-none rounded-xl cursor-pointer text-base font-medium transition-all duration-200"
               onClick={() => navigate("/projects")}
             >
-              {t('language') === 'id' ? 'Tambahkan Proyek Pertama Anda' : 'Add Your First Project'}
+              Add Your First Project
             </button>
           </div>
         )}

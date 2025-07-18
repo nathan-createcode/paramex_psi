@@ -224,6 +224,8 @@ export default function ProjectManagementPage() {
           <p className="text-gray-600">
             {t('language') === 'id' ? 'Kelola dan lacak semua proyek freelance Anda' : 'Manage and track all your freelance projects'}
           </p>
+          
+          
         </div>
 
         <SearchAndFilters

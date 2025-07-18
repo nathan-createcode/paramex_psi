@@ -1,153 +1,36 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { ChevronDown, ChevronUp, TrendingUp, AlertTriangle } from "lucide-react"
 import { supabase } from "../supabase/supabase"
+import { useNavigate } from "react-router-dom"
 import Layout from "../components/Layout"
-import { ChevronDown } from "lucide-react"
-import Dropdown from "../components/ui/dropdown"
 
 const DSS = () => {
+  const navigate = useNavigate()
+  const [expandedProjects, setExpandedProjects] = useState(new Set())
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
-  const [calculating, setCalculating] = useState(false)
-  const [weights, setWeights] = useState(() => {
-    // Load weights from localStorage or use default
-    const savedWeights = localStorage.getItem('dss-weights')
-    return savedWeights ? JSON.parse(savedWeights) : {
-      deadline: 40,
-      payment: 30,
-      difficulty: 30,
-    }
-  })
-  const [selectedProjects, setSelectedProjects] = useState(() => {
-    // Load selected projects from localStorage or use default
-    const savedSelection = localStorage.getItem('dss-selected-projects')
-    return savedSelection ? JSON.parse(savedSelection) : "all"
-  })
-  const [priorityResults, setPriorityResults] = useState(() => {
-    // Load priority results from localStorage or use empty array
-    const savedResults = localStorage.getItem('dss-priority-results')
-    return savedResults ? JSON.parse(savedResults) : []
-  })
-  const navigate = useNavigate()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [user, setUser] = useState(null)
 
-  // Save weights to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('dss-weights', JSON.stringify(weights))
-  }, [weights])
+  /**
+   * Priority Score Calculation Formula:
+   * Priority Score = (deadline_score × 9) + (payment_score × 7) + (difficulty_score × 5)
+   *
+   * Weights: Deadline=9, Payment=7, Difficulty=5
+   * Max Priority Score: (5×9) + (3×7) + (3×5) = 81
+   *
+   * Scoring System:
+   * - Deadline: 1-5 (based on urgency)
+   * - Payment: Low=1, Medium=2, High=3
+   * - Difficulty: Low=3, Medium=2, High=1 (inverted - easier gets higher priority)
+   */
 
-  // Save selected projects to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('dss-selected-projects', JSON.stringify(selectedProjects))
-  }, [selectedProjects])
+  // Updated normalization function for max score 81
+  const normalizeScore = (rawScore) => Math.round((rawScore / 81) * 100)
 
-  // Save priority results to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('dss-priority-results', JSON.stringify(priorityResults))
-  }, [priorityResults])
-
-  // Add custom CSS for sliders
-  useEffect(() => {
-    const style = document.createElement('style')
-    style.textContent = `
-      .deadline-slider::-webkit-slider-thumb,
-      .payment-slider::-webkit-slider-thumb,
-      .difficulty-slider::-webkit-slider-thumb {
-        appearance: none;
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        background: #F9FAFB;
-        border: 2px solid #D1D5DB;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-      .deadline-slider::-webkit-slider-thumb:hover,
-      .payment-slider::-webkit-slider-thumb:hover,
-      .difficulty-slider::-webkit-slider-thumb:hover {
-        transform: scale(1.1);
-      }
-      .deadline-slider::-webkit-slider-thumb:active,
-      .payment-slider::-webkit-slider-thumb:active,
-      .difficulty-slider::-webkit-slider-thumb:active {
-        transform: scale(0.95);
-      }
-
-      /* Firefox slider thumb */
-      .deadline-slider::-moz-range-thumb,
-      .payment-slider::-moz-range-thumb,
-      .difficulty-slider::-moz-range-thumb {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        border: none;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-
-      .deadline-slider::-moz-range-thumb,
-      .payment-slider::-moz-range-thumb,
-      .difficulty-slider::-moz-range-thumb {
-        background: #F9FAFB;
-        border: 2px solid #D1D5DB;
-      }
-
-      /* Slider track styling */
-      .deadline-slider::-webkit-slider-track,
-      .payment-slider::-webkit-slider-track,
-      .difficulty-slider::-webkit-slider-track {
-        height: 8px;
-        border-radius: 10px;
-        outline: none;
-      }
-
-      .deadline-slider:hover,
-      .payment-slider:hover,
-      .difficulty-slider:hover {
-        opacity: 0.8;
-      }
-
-      @keyframes pulse {
-        0% { opacity: 1; }
-        50% { opacity: 0.7; }
-        100% { opacity: 1; }
-      }
-
-      .deadline-slider:focus,
-      .payment-slider:focus,
-      .difficulty-slider:focus {
-        animation: pulse 2s ease-in-out infinite;
-      }
-
-      /* Custom scrollbar for results list */
-      .results-scroll::-webkit-scrollbar {
-        width: 8px;
-      }
-      
-      .results-scroll::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 4px;
-      }
-      
-      .results-scroll::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
-        transition: background 0.2s ease;
-      }
-      
-      .results-scroll::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
-    `
-    document.head.appendChild(style)
-
-    return () => {
-      document.head.removeChild(style)
-    }
-  }, [])
-
-  // Authentication check
+  // Check authentication first
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -163,6 +46,7 @@ const DSS = () => {
           return
         }
 
+        setUser(session.user)
         await fetchProjects(session.user.id)
       } catch (error) {
         console.error("Auth error:", error)
@@ -173,383 +57,540 @@ const DSS = () => {
     checkAuth()
   }, [navigate])
 
-  // Fetch projects from Supabase
+  // Fetch projects from database - FIXED: Added user filtering
   const fetchProjects = async (userId) => {
     try {
       setLoading(true)
+
+      // FIXED: Added user_id filter and made status filter optional
       const { data, error } = await supabase
         .from("projects")
         .select(`
           *,
-          type_id:type_id ( type_name ),
-          status_id:status_id ( status_name )
+          project_status(status_name),
+          project_type(type_name)
         `)
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
+        .eq("user_id", userId) // FIXED: Filter by current user
+        .neq("status_id", 3) // Exclude projects with status "Done" for DSS prioritization
+        .neq("status_id", 4)
+        .order("priority_score", { ascending: false })
 
-      if (error) throw error
-      
-      // Map the data to include status from status_id relation and correct field names
-      const mappedProjects = (data || []).map(project => ({
-        ...project,
+      if (error) {
+        console.error("Error fetching projects:", error)
+        return
+      }
+
+      // Transform data to match the expected format
+      const transformedProjects = data.map((project) => ({
         id: project.project_id,
-        name: project.project_name,
-        client: project.client_name,
+        project_name: project.project_name,
+        client_name: project.client_name,
+        priority_score: project.priority_score || 0,
+        deadline_score: project.deadline_score || 1,
+        payment_score: project.payment_score || 1,
+        difficulty_score: project.difficulty_score || 1,
+        payment_amount: project.payment_amount || 0,
+        difficulty_level: project.difficulty_level || "Low",
         deadline: project.deadline,
-        payment: project.payment_amount,
-        difficulty: project.difficulty_level,
-        status: project.status_id?.status_name || "unknown",
-        project_type: project.type_id?.type_name || "unknown"
-      })).filter(project => project.status_id?.status_name !== "Done") // Filter out completed projects
+        days_until_deadline: project.deadline
+          ? Math.ceil((new Date(project.deadline) - new Date()) / (1000 * 60 * 60 * 24))
+          : 0,
+      }))
 
-      console.log("DSS Projects loaded:", mappedProjects)
-      setProjects(mappedProjects)
+      console.log(`DSS: Loaded ${transformedProjects.length} projects for user ${userId}`)
+      setProjects(transformedProjects)
     } catch (error) {
-      console.error("Error fetching projects:", error)
+      console.error("Error:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  // Calculate priority scores
-  const calculatePriority = async () => {
-    setCalculating(true)
+  /**
+   * Badge Logic Implementation:
+   * - Only applies to projects with same priority_score
+   * - Priority order: deadline_score > payment_score > difficulty_score
+   * - Badge types:
+   *   - "Urgent Deadline" - highest deadline_score among tied projects
+   */
+  const calculateBadges = (projects) => {
+    const projectsWithBadges = [...projects]
 
-    // Simulate calculation delay
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    // Group projects by priority_score
+    const groupedByScore = {}
+    projects.forEach((project) => {
+      const score = project.priority_score
+      if (!groupedByScore[score]) {
+        groupedByScore[score] = []
+      }
+      groupedByScore[score].push(project)
+    })
 
-    let projectsToAnalyze = projects
+    // Apply badge logic only to groups with multiple projects
+    Object.keys(groupedByScore).forEach((score) => {
+      const group = groupedByScore[score]
+      if (group.length > 1) {
+        // Find highest deadline_score
+        const maxDeadlineScore = Math.max(...group.map((p) => p.deadline_score))
+        const deadlineWinners = group.filter((p) => p.deadline_score === maxDeadlineScore)
 
-    if (selectedProjects !== "all") {
-      projectsToAnalyze = projects.filter((p) => p.status === selectedProjects)
-    }
-
-    const results = projectsToAnalyze.map((project) => {
-      // Calculate deadline score (closer deadline = higher score)
-      const daysUntilDeadline = Math.ceil((new Date(project.deadline) - new Date()) / (1000 * 60 * 60 * 24))
-      const deadlineScore = Math.max(0, Math.min(100, 100 - daysUntilDeadline * 2))
-
-      // Calculate payment score (higher payment = higher score)
-      const maxPayment = Math.max(...projectsToAnalyze.map((p) => p.payment || 0))
-      const paymentScore = maxPayment > 0 ? ((project.payment || 0) / maxPayment) * 100 : 0
-
-      // Calculate difficulty score (higher difficulty = lower score for prioritization)
-      const difficultyScore = project.difficulty === "high" ? 30 : project.difficulty === "medium" ? 60 : 90
-
-      // Calculate weighted score
-      const totalScore = Math.round(
-        (deadlineScore * weights.deadline) / 100 +
-          (paymentScore * weights.payment) / 100 +
-          (difficultyScore * weights.difficulty) / 100,
-      )
-
-      return {
-        ...project,
-        score: totalScore,
-        factors: {
-          deadline: daysUntilDeadline <= 7 ? "High" : daysUntilDeadline <= 30 ? "Medium" : "Low",
-          payment: (project.payment || 0) >= 5000 ? "High" : (project.payment || 0) >= 2000 ? "Medium" : "Low",
-          difficulty: project.difficulty || "medium",
-        },
+        if (deadlineWinners.length === 1) {
+          // Single winner by deadline
+          const winner = projectsWithBadges.find((p) => p.id === deadlineWinners[0].id)
+          winner.urgencyBadge = "Urgent Deadline"
+        }
       }
     })
 
-    // Sort by score (highest first)
-    results.sort((a, b) => b.score - a.score)
-    setPriorityResults(results)
-    setCalculating(false)
+    return projectsWithBadges
   }
 
-  const handleWeightChange = (name, value) => {
-    setWeights((prev) => ({
-      ...prev,
-      [name]: value[0],
-    }))
+  // Advanced Tie-Breaking System
+  const advancedSort = (projects) => {
+    return projects.sort((a, b) => {
+      // Primary sort: Priority Score (descending)
+      if (a.priority_score !== b.priority_score) {
+        return b.priority_score - a.priority_score
+      }
+
+      // Secondary sort: Advanced tie-breaking for same priority_score
+      // 1. Deadline tie-breaking (for deadline_score = 1, sort by days ascending)
+      if (a.deadline_score === 1 && b.deadline_score === 1 && a.deadline_score === b.deadline_score) {
+        if (a.days_until_deadline !== b.days_until_deadline) {
+          return a.days_until_deadline - b.days_until_deadline // Lower days = higher priority
+        }
+      }
+
+      // 2. Payment tie-breaking (for payment_score = 3, sort by amount descending)
+      if (a.payment_score === 3 && b.payment_score === 3 && a.payment_score === b.payment_score) {
+        if (a.payment_amount !== b.payment_amount) {
+          return b.payment_amount - a.payment_amount // Higher amount = higher priority
+        }
+      }
+
+      // 3. General deadline comparison (higher deadline_score = higher priority)
+      if (a.deadline_score !== b.deadline_score) {
+        return b.deadline_score - a.deadline_score
+      }
+
+      // 4. General payment comparison (higher payment_score = higher priority)
+      if (a.payment_score !== b.payment_score) {
+        return b.payment_score - a.payment_score
+      }
+
+      // 5. Difficulty comparison (higher difficulty_score = higher priority)
+      if (a.difficulty_score !== b.difficulty_score) {
+        return b.difficulty_score - a.difficulty_score
+      }
+
+      // Final fallback: alphabetical by project name
+      return a.project_name.localeCompare(b.project_name)
+    })
   }
 
-  // Clear stored data function (optional - for debugging or reset functionality)
-  const clearStoredData = () => {
-    localStorage.removeItem('dss-weights')
-    localStorage.removeItem('dss-selected-projects')
-    localStorage.removeItem('dss-priority-results')
-    setWeights({ deadline: 40, payment: 30, difficulty: 30 })
-    setSelectedProjects("all")
-    setPriorityResults([])
+  const projectsWithBadges = advancedSort(calculateBadges(projects))
+
+  // Filter projects based on search query
+  const filteredProjectsWithBadges = projectsWithBadges.filter((project) => {
+    if (!searchQuery.trim()) return true
+
+    const query = searchQuery.toLowerCase()
+    const projectName = project.project_name.toLowerCase()
+    const clientName = project.client_name.toLowerCase()
+
+    return projectName.includes(query) || clientName.includes(query)
+  })
+
+  const toggleExpanded = (projectId) => {
+    const newExpanded = new Set(expandedProjects)
+    if (newExpanded.has(projectId)) {
+      newExpanded.delete(projectId)
+    } else {
+      newExpanded.add(projectId)
+    }
+    setExpandedProjects(newExpanded)
+  }
+
+  // Helper function to get deadline level name from days left (REAL-TIME)
+  const getDeadlineLevelFromDays = (daysLeft) => {
+    if (daysLeft <= 1) {
+      return "Super Urgent"
+    } else if (daysLeft === 2) {
+      return "Urgent"
+    } else if (daysLeft >= 3 && daysLeft <= 5) {
+      return "High"
+    } else if (daysLeft >= 6 && daysLeft <= 9) {
+      return "Medium"
+    } else {
+      return "Low"
+    }
+  }
+
+  // Update getDeadlineCategory to use days left instead of score
+  const getDeadlineCategory = (daysLeft) => {
+    if (daysLeft <= 1) {
+      return "Super Urgent"
+    } else if (daysLeft === 2) {
+      return "Urgent"
+    } else if (daysLeft >= 3 && daysLeft <= 5) {
+      return "High"
+    } else if (daysLeft >= 6 && daysLeft <= 9) {
+      return "Medium"
+    } else {
+      return "Low"
+    }
+  }
+
+  // Update getDeadlineBadgeStyle to use days left
+  const getDeadlineBadgeStyle = (daysLeft) => {
+    if (daysLeft <= 1) {
+      // Super Urgent: Dark Red
+      return { backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }
+    } else if (daysLeft === 2) {
+      // Urgent: Red
+      return { backgroundColor: "#FEF2F2", color: "#EF4444", border: "1px solid #FECACA" }
+    } else if (daysLeft >= 3 && daysLeft <= 5) {
+      // High: Orange
+      return { backgroundColor: "#FFF7ED", color: "#F97316", border: "1px solid #FED7AA" }
+    } else if (daysLeft >= 6 && daysLeft <= 9) {
+      // Medium: Yellow
+      return { backgroundColor: "#FFFBEB", color: "#EAB308", border: "1px solid #FDE68A" }
+    } else {
+      // Low: Green
+      return { backgroundColor: "#ECFDF5", color: "#22C55E", border: "1px solid #A7F3D0" }
+    }
+  }
+
+  const getPaymentCategory = (score) => {
+    switch (score) {
+      case 1:
+        return "Low Payment"
+      case 2:
+        return "Medium Payment"
+      case 3:
+        return "High Payment"
+      default:
+        return "Unknown"
+    }
+  }
+
+  // Updated deadline badge style with exact color hierarchy
+  // const getDeadlineBadgeStyle = (deadlineScore) => {
+  //   switch (deadlineScore) {
+  //     case 5:
+  //       // Score 5: Dark Red
+  //       return { backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }
+  //     case 4:
+  //       // Score 4: Red
+  //       return { backgroundColor: "#FEF2F2", color: "#EF4444", border: "1px solid #FECACA" }
+  //     case 3:
+  //       // Score 3: Orange
+  //       return { backgroundColor: "#FFF7ED", color: "#F97316", border: "1px solid #FED7AA" }
+  //     case 2:
+  //       // Score 2: Yellow
+  //       return { backgroundColor: "#FFFBEB", color: "#EAB308", border: "1px solid #FDE68A" }
+  //     case 1:
+  //       // Score 1: Green
+  //       return { backgroundColor: "#ECFDF5", color: "#22C55E", border: "1px solid #A7F3D0" }
+  //     default:
+  //       return { backgroundColor: "#F7FAFC", color: "#718096", border: "1px solid #E2E8F0" }
+  //   }
+  // }
+
+  // Payment badge style (unchanged)
+  const getPaymentBadgeStyle = (paymentScore) => {
+    switch (paymentScore) {
+      case 3:
+        // High payment → Red
+        return { backgroundColor: "#FEF2F2", color: "#F87171", border: "1px solid #FECACA" }
+      case 2:
+        // Medium payment → Amber
+        return { backgroundColor: "#FFFBEB", color: "#FCD34D", border: "1px solid #FDE68A" }
+      case 1:
+        // Low payment → Green
+        return { backgroundColor: "#ECFDF5", color: "#34D399", border: "1px solid #A7F3D0" }
+      default:
+        return { backgroundColor: "#EDF2F7", color: "#4A5568", border: "1px solid #CBD5E0" }
+    }
+  }
+
+  // Difficulty badge style (unchanged)
+  const getDifficultyBadgeStyle = (level) => {
+    switch (level.toLowerCase()) {
+      case "high":
+        // High difficulty → Red
+        return { backgroundColor: "#FEF2F2", color: "#F87171", border: "1px solid #FECACA" }
+      case "medium":
+        // Medium difficulty → Amber
+        return { backgroundColor: "#FFFBEB", color: "#FCD34D", border: "1px solid #FDE68A" }
+      case "low":
+        // Low difficulty → Green
+        return { backgroundColor: "#ECFDF5", color: "#34D399", border: "1px solid #A7F3D0" }
+      default:
+        return { backgroundColor: "#EDF2F7", color: "#4A5568", border: "1px solid #CBD5E0" }
+    }
+  }
+
+  // Helper function to get deadline level name from score
+  // const getDeadlineLevelFromScore = (deadlineScore) => {
+  //   switch (deadlineScore) {
+  //     case 5:
+  //       return "Super Urgent"
+  //     case 4:
+  //       return "Urgent"
+  //     case 3:
+  //       return "High"
+  //     case 2:
+  //       return "Medium"
+  //     case 1:
+  //       return "Low"
+  //     default:
+  //       return "Unknown"
+  //   }
+  // }
+
+  // Payment level mapping (unchanged)
+  const getPaymentLevel = (paymentScore) => {
+    switch (paymentScore) {
+      case 1:
+        return "Low"
+      case 2:
+        return "Medium"
+      case 3:
+        return "High"
+      default:
+        return "Unknown"
+    }
   }
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[70vh]">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading DSS...</p>
+        <div style={styles.container}>
+          <div style={styles.header}>
+            <div style={styles.headerContent}>
+              <div style={styles.headerIconContainer}>
+                <TrendingUp size={40} color="#FFFFFF" style={styles.headerIcon} />
+              </div>
+              <div>
+                <h1 style={styles.title}>
+                  Project Prioritization <span style={styles.titleAccent}>DSS</span>
+                </h1>
+                <p style={styles.subtitle}>Loading projects...</p>
+              </div>
+            </div>
+          </div>
         </div>
       </Layout>
     )
   }
 
-      return (
-      <Layout>
-        <div className="max-w-7xl mx-auto" style={styles.container}>
-        {/* Header */}
+  return (
+    <Layout>
+      <div style={styles.container}>
+        {/* Enhanced Header Section */}
         <div style={styles.header}>
-          <div>
-            <h1 style={styles.title}>Decision Support System</h1>
-            <p style={styles.subtitle}>
-              Get intelligent project prioritization based on deadline, payment, and difficulty factors
-            </p>
+          <div style={styles.headerContent}>
+            <div style={styles.headerIconContainer}>
+              <TrendingUp size={40} color="#FFFFFF" style={styles.headerIcon} />
+            </div>
+            <div>
+              <h1 style={styles.title}>
+                Project Prioritization <span style={styles.titleAccent}>DSS</span>
+              </h1>
+              <p style={styles.subtitle}>
+                Prioritaskan proyek berdasarkan sistem skor terstruktur berbasis DSS
+                {user && (
+                  <span style={{ display: "block", fontSize: "14px", marginTop: "4px", color: "#718096" }}>
+                    Showing{" "}
+                    <span
+                      style={{
+                        backgroundColor: "#EBF4FF",
+                        color: "#3B82F6",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontSize: "13px",
+                        fontWeight: "1000",
+                        display: "inline",
+                        marginLeft: "2px",
+                        marginRight: "2px",
+                        border: "1px solid #BFDBFE",
+                      }}
+                    >
+                      {filteredProjectsWithBadges.length} active projects
+                    </span>{" "}
+                    for {user.user_metadata?.full_name || user.email}
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div style={styles.content}>
-          {/* DSS Form */}
-          <div style={styles.formCard}>
-            <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>
-                <SettingsIcon />
-                Configure Priority Weights
-              </h2>
+        {/* Search Bar Section */}
+        <div style={styles.searchSection}>
+          <div style={styles.searchContainer}>
+            <div style={styles.searchIcon}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
             </div>
-            <div style={styles.cardContent}>
-              <div style={styles.weightsContainer}>
-                {/* Deadline Weight */}
-                <div style={styles.weightGroup}>
-                  <div style={styles.weightHeader}>
-                    <label style={styles.weightLabel}>Deadline Weight</label>
-                    <span style={{
-                      ...styles.weightValue,
-                      background: "linear-gradient(135deg, #495057, #343A40)",
-                      backgroundColor: "transparent",
-                      border: "none",
-                    }}>{weights.deadline}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={weights.deadline}
-                    onChange={(e) => handleWeightChange("deadline", [Number.parseInt(e.target.value)])}
-                    style={{
-                      ...styles.slider,
-                      ...styles.sliderDeadline,
-                    }}
-                    className="deadline-slider"
-                  />
-                </div>
-
-                {/* Payment Weight */}
-                <div style={styles.weightGroup}>
-                  <div style={styles.weightHeader}>
-                    <label style={styles.weightLabel}>Payment Weight</label>
-                    <span style={{
-                      ...styles.weightValue,
-                      background: "linear-gradient(135deg, #495057, #343A40)",
-                      backgroundColor: "transparent",
-                      border: "none",
-                    }}>{weights.payment}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={weights.payment}
-                    onChange={(e) => handleWeightChange("payment", [Number.parseInt(e.target.value)])}
-                    style={{
-                      ...styles.slider,
-                      ...styles.sliderPayment,
-                    }}
-                    className="payment-slider"
-                  />
-                </div>
-
-                {/* Difficulty Weight */}
-                <div style={styles.weightGroup}>
-                  <div style={styles.weightHeader}>
-                    <label style={styles.weightLabel}>Difficulty Weight</label>
-                    <span style={{
-                      ...styles.weightValue,
-                      background: "linear-gradient(135deg, #495057, #343A40)",
-                      backgroundColor: "transparent",
-                      border: "none",
-                    }}>{weights.difficulty}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={weights.difficulty}
-                    onChange={(e) => handleWeightChange("difficulty", [Number.parseInt(e.target.value)])}
-                    style={{
-                      ...styles.slider,
-                      ...styles.sliderDifficulty,
-                    }}
-                    className="difficulty-slider"
-                  />
-                </div>
-              </div>
-
-              {/* Project Selection */}
-              <div style={styles.projectSelection}>
-                <label style={styles.selectLabel}>Projects to Analyze</label>
-                <Dropdown
-                  value={selectedProjects}
-                  onChange={(value) => setSelectedProjects(value)}
-                  options={[
-                    { value: "all", label: "All Active Projects" },
-                    { value: "On-Plan", label: "On-Plan Projects" },
-                    { value: "On-Process", label: "On-Process Projects" }
-                  ]}
-                  placeholder="Select projects"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Calculate Button */}
-              <button
-                onClick={calculatePriority}
-                disabled={calculating || projects.length === 0}
-                style={{
-                  ...styles.calculateButton,
-                  ...(calculating || projects.length === 0 ? styles.calculateButtonDisabled : {}),
-                }}
-              >
-                {calculating ? (
-                  <>
-                    <div style={styles.buttonSpinner}></div>
-                    Calculating...
-                  </>
-                ) : (
-                  <>
-                    <CalculateIcon />
-                    Calculate Priority
-                  </>
-                )}
+            <input
+              type="text"
+              placeholder="Cari proyek atau klien..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={styles.searchInput}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} style={styles.clearButton}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
+            )}
+          </div>
+        </div>
+
+        {/* Enhanced Priority Result Section */}
+        <div style={styles.resultsCard}>
+          <div style={styles.cardHeader}>
+            <div style={styles.cardHeaderContent}>
+              <h2 style={styles.cardTitle}>Priority Result</h2>
             </div>
           </div>
-
-          {/* Results */}
-          <div style={styles.resultsCard}>
-            <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>
-                <ResultsIcon />
-                Priority Results
-              </h2>
-            </div>
-            <div style={styles.cardContent}>
-              {priorityResults.length === 0 ? (
-                <div style={styles.emptyResults}>
-                  <ChartIcon />
-                  <h3 style={styles.emptyTitle}>No Results Yet</h3>
-                  <p style={styles.emptyDescription}>
-                    Configure your priority weights and click "Calculate Priority" to see intelligent project
-                    recommendations.
-                  </p>
-                </div>
-              ) : (
-                <div style={styles.resultsList} className="results-scroll">
-                  {priorityResults.map((result, index) => {
-                    // Calculate progress percentage based on highest score
-                    const maxScore = Math.max(...priorityResults.map(r => r.score))
-                    const progressPercentage = maxScore > 0 ? (result.score / maxScore) * 100 : 0
-                    
-                    return (
-                      <div key={result.id} style={styles.resultItem}>
-                          <div style={styles.resultRank}>#{index + 1}</div>
-                            <div style={styles.resultContent}>
-                              <div style={styles.resultItem2}>
-                                <div style={styles.resultContent}>
-                                  <div style={styles.resultHeader}>
-                                    <h3 style={styles.resultTitle}>{result.name}</h3>
-                                  </div>
-                                  <p style={styles.resultClient}>Client: {result.client}</p>
-                                  <div>
-                                    <div style={styles.resultFactors}>
-                                      <span
-                                        style={{
-                                          ...styles.factorBadge,
-                                          backgroundColor:
-                                            result.factors.deadline === "High"
-                                              ? "#FEF2F2"
-                                              : result.factors.deadline === "Medium"
-                                                ? "#FFFBEB"
-                                                : "#EFF6FF",
-                                          color:
-                                            result.factors.deadline === "High"
-                                              ? "#DC2626"
-                                              : result.factors.deadline === "Medium"
-                                                ? "#D97706"
-                                                : "#2563EB",
-                                        }}
-                                      >
-                                        Deadline: {result.factors.deadline}
-                                      </span>
-                                      <span
-                                        style={{
-                                          ...styles.factorBadge,
-                                          backgroundColor:
-                                            result.factors.payment === "High"
-                                              ? "#ECFDF5"
-                                              : result.factors.payment === "Medium"
-                                                ? "#FFFBEB"
-                                                : "#EFF6FF",
-                                          color:
-                                            result.factors.payment === "High"
-                                              ? "#059669"
-                                              : result.factors.payment === "Medium"
-                                                ? "#D97706"
-                                                : "#2563EB",
-                                        }}
-                                      >
-                                        Payment: {result.factors.payment}
-                                      </span>
-                                      <span
-                                        style={{
-                                          ...styles.factorBadge,
-                                          backgroundColor:
-                                            result.factors.difficulty === "high"
-                                              ? "#FEF2F2"
-                                              : result.factors.difficulty === "medium"
-                                                ? "#FFFBEB"
-                                                : "#ECFDF5",
-                                          color:
-                                            result.factors.difficulty === "high"
-                                              ? "#DC2626"
-                                              : result.factors.difficulty === "medium"
-                                                ? "#D97706"
-                                                : "#059669",
-                                        }}
-                                      >
-                                        Difficulty:{" "}
-                                        {result.factors.difficulty.charAt(0).toUpperCase() + result.factors.difficulty.slice(1)}
-                                      </span>
-                                    </div>
-                                </div>
-                              </div>
-                            <div style={styles.resultScore}>
-                              <span style={styles.scoreValue}>{result.score}</span>
-                              <span style={styles.scoreLabel}>Priority Score</span>
-                            </div>  
+          <div style={styles.cardContent}>
+            <div style={styles.projectsList}>
+              {filteredProjectsWithBadges.map((project, index) => (
+                <div key={project.id} style={styles.projectCard}>
+                  {/* Main Content Area - Split into Left and Right */}
+                  <div style={styles.cardMainContent}>
+                    {/* Left Side - Project Info */}
+                    <div style={styles.leftSection}>
+                      <div style={styles.projectHeader}>
+                        <div style={styles.projectTitleRow}>
+                          <span style={styles.projectNumber}>#{index + 1}</span>
+                          <h3 style={styles.projectName}>{project.project_name}</h3>
+                          {project.urgencyBadge && (
+                            <div style={styles.urgencyBadge}>
+                              <AlertTriangle size={12} color="#FDBA74" />
+                              <span style={styles.urgencyBadgeText}>{project.urgencyBadge}</span>
                             </div>
-                                                     <div style={styles.progressContainer}>
-                             <div style={styles.progressBar}>
-                               <div
-                                 style={{
-                                   ...styles.progressFill,
-                                   width: `${progressPercentage}%`,
-                                   backgroundColor:
-                                     index === 0 ? "#DC2626" : index === 1 ? "#D97706" : index === 2 ? "#F59E0B" : "#3B82F6",
-                                 }}
-                               ></div>
-                             </div>
-                           </div>
+                          )}
                         </div>
+                        <p style={styles.clientName}>Client: {project.client_name}</p>
                       </div>
-                    )
-                  })}
+
+                      {/* Factor Badges with Updated Colors */}
+                      <div style={styles.factorBadges}>
+                        <span
+                          style={{
+                            ...styles.factorBadge,
+                            ...getDeadlineBadgeStyle(project.days_until_deadline),
+                          }}
+                        >
+                          Deadline: {getDeadlineLevelFromDays(project.days_until_deadline)} (
+                          {project.days_until_deadline} days left)
+                        </span>
+                        <span
+                          style={{
+                            ...styles.factorBadge,
+                            ...getPaymentBadgeStyle(project.payment_score),
+                          }}
+                        >
+                          Payment: {getPaymentLevel(project.payment_score)} (${project.payment_amount.toLocaleString()})
+                        </span>
+                        <span
+                          style={{
+                            ...styles.factorBadge,
+                            ...getDifficultyBadgeStyle(project.difficulty_level),
+                          }}
+                        >
+                          Difficulty: {project.difficulty_level}
+                        </span>
+                      </div>
+
+                      {/* Details Button */}
+                      <div style={styles.detailsSection}>
+                        <button style={styles.detailsButton} onClick={() => toggleExpanded(project.id)}>
+                          <span>Details</span>
+                          {expandedProjects.has(project.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Right Side - Enhanced Priority Score */}
+                    <div style={styles.rightSection}>
+                      <div style={styles.scoreContainer}>
+                        <div style={styles.scoreCircle}>
+                          <span style={styles.scoreValue}>{normalizeScore(project.priority_score)}</span>
+                        </div>
+                        <div style={styles.progressContainer}>
+                          <div style={styles.progressBar}>
+                            <div
+                              style={{
+                                ...styles.progressFill,
+                                width: `${normalizeScore(project.priority_score)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <span style={styles.scoreLabel}>Priority Score</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Reasoning */}
+                  {expandedProjects.has(project.id) && (
+                    <div style={styles.reasoningSection}>
+                      <p style={styles.reasoningText}>
+                        Proyek {project.project_name} untuk klien {project.client_name} diprioritaskan karena memiliki
+                        nilai Priority Score sebesar {normalizeScore(project.priority_score)}/100. Nilai ini didapat
+                        dari kombinasi beberapa faktor:
+                      </p>
+                      <ul style={styles.reasoningList}>
+                        <li>
+                          Deadline: (batas waktu {project.days_until_deadline} hari lagi, kategori{" "}
+                          {getDeadlineCategory(project.days_until_deadline)})
+                        </li>
+                        <li>
+                          Payment: (nilai pembayaran ${project.payment_amount.toLocaleString()}, kategori{" "}
+                          {getPaymentCategory(project.payment_score)})
+                        </li>
+                        <li>Difficulty: (tingkat kesulitan {project.difficulty_level})</li>
+                      </ul>
+                      <p style={styles.reasoningText}>
+                        Dengan kombinasi nilai tersebut dan bobot masing-masing faktor, proyek ini menempati urutan
+                        prioritas saat ini.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {filteredProjectsWithBadges.length === 0 && searchQuery && (
+                <div style={styles.emptySearchState}>
+                  <div style={styles.emptySearchIcon}>🔍</div>
+                  <h3 style={styles.emptySearchTitle}>Tidak ada proyek ditemukan</h3>
+                  <p style={styles.emptySearchDescription}>
+                    Tidak ada proyek yang cocok dengan pencarian "{searchQuery}". Coba gunakan kata kunci yang berbeda.
+                  </p>
+                  <button onClick={() => setSearchQuery("")} style={styles.clearSearchButton}>
+                    Hapus Pencarian
+                  </button>
+                </div>
+              )}
+              {filteredProjectsWithBadges.length === 0 && !searchQuery && (
+                <div style={styles.emptySearchState}>
+                  <div style={styles.emptySearchIcon}>📊</div>
+                  <h3 style={styles.emptySearchTitle}>Tidak ada proyek aktif</h3>
+                  <p style={styles.emptySearchDescription}>
+                    Semua proyek Anda sudah selesai atau belum ada proyek yang perlu diprioritaskan.
+                  </p>
+                  <button onClick={() => navigate("/projects")} style={styles.clearSearchButton}>
+                    Kelola Proyek
+                  </button>
                 </div>
               )}
             </div>
@@ -560,361 +601,346 @@ const DSS = () => {
   )
 }
 
-// Icon Components
-const SettingsIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-)
-
-const CalculateIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
-    <rect x="9" y="9" width="1" height="1" />
-    <rect x="14" y="9" width="1" height="1" />
-    <rect x="9" y="14" width="1" height="1" />
-    <rect x="14" y="14" width="1" height="1" />
-  </svg>
-)
-
-const ResultsIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
-    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
-  </svg>
-)
-
-const ChartIcon = () => (
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="1">
-    <line x1="18" y1="20" x2="18" y2="10" />
-    <line x1="12" y1="20" x2="12" y2="4" />
-    <line x1="6" y1="20" x2="6" y2="14" />
-  </svg>
-)
-
 const styles = {
   container: {
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  },
-  loadingContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "50vh",
-  },
-  spinner: {
-    width: "40px",
-    height: "40px",
-    border: "4px solid #e5e7eb",
-    borderTop: "4px solid #3b82f6",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-    marginBottom: "16px",
+    minHeight: "100vh",
   },
   header: {
-    marginBottom: "20px",
+    marginBottom: "40px",
+  },
+  headerContent: {
+    display: "flex",
+    alignItems: "center",
+    gap: "20px",
+    padding: "24px",
+    background: "linear-gradient(135deg, #FFFFFF 0%, #F8FAFF 100%)",
+    borderRadius: "16px",
+    boxShadow: "8px 8px 16px rgba(163, 177, 198, 0.15), -8px -8px 16px rgba(255, 255, 255, 0.7)",
+    border: "1px solid rgba(79, 156, 249, 0.1)",
+  },
+  headerIconContainer: {
+    width: "64px",
+    height: "64px",
+    borderRadius: "16px",
+    background: "linear-gradient(135deg, #4F9CF9 0%, #2B77E5 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 4px 12px rgba(79, 156, 249, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+    flexShrink: 0,
+  },
+  headerIcon: {
+    color: "#FFFFFF",
   },
   title: {
     fontSize: "32px",
-    fontWeight: "bold",
-    color: "#1f2937",
+    fontWeight: "700",
+    color: "#1A202C",
     margin: "0 0 8px 0",
+  },
+  titleAccent: {
+    color: "#4F9CF9",
   },
   subtitle: {
     fontSize: "16px",
-    color: "#6b7280",
+    fontWeight: "400",
+    color: "#718096",
     margin: 0,
-  },
-  content: {
-    display: "grid",
-    gridTemplateColumns: "400px 1fr",
-    gap: "20px",
-    alignItems: "start",
-    padding: "0 8px",
-  },
-  formCard: {
-    backgroundColor: "transparent",
-    borderRadius: "0",
-    boxShadow: "none",
-    overflow: "visible",
-    position: "relative",
-    zIndex: 1,
   },
   resultsCard: {
-    backgroundColor: "transparent",
-    borderRadius: "0",
-    boxShadow: "none",
+    background: "linear-gradient(135deg, #FFFFFF 0%, #F8FAFF 100%)",
+    borderRadius: "20px",
+    boxShadow: "12px 12px 24px rgba(163, 177, 198, 0.15), -12px -12px 24px rgba(255, 255, 255, 0.7)",
+    border: "1px solid rgba(79, 156, 249, 0.1)",
     overflow: "hidden",
-    height: "calc(100vh - 240px)",
-    display: "flex",
-    flexDirection: "column",
   },
   cardHeader: {
-    padding: "0 0 0 0",
-    borderBottom: "none",
-    paddingBottom: "12px",
-    marginBottom: "16px",
+    padding: "32px 32px 24px 32px",
+  },
+  cardHeaderContent: {
+    padding: "20px",
+    background: "linear-gradient(135deg, #F8FAFF 0%, #EEF4FF 100%)",
+    borderRadius: "12px",
+    boxShadow: "inset 2px 2px 6px rgba(163, 177, 198, 0.1), inset -2px -2px 6px rgba(255, 255, 255, 0.9)",
+    border: "1px solid rgba(79, 156, 249, 0.1)",
   },
   cardTitle: {
-    fontSize: "20px",
-    fontWeight: "600",
-    color: "#1f2937",
-    margin: 0,
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  cardContent: {
-    padding: "0",
-    flex: 1,
-    overflow: "visible",
-    display: "flex",
-    flexDirection: "column",
-  },
-  weightsContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    marginBottom: "20px",
-    padding: "0 8px",
-  },
-  weightGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  weightHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  weightLabel: {
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#374151",
-  },
-  weightValue: {
-    fontSize: "14px",
+    fontSize: "24px",
     fontWeight: "700",
-    background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    backgroundClip: "text",
-    padding: "0",
-    borderRadius: "0",
-    backgroundColor: "transparent",
-    border: "none",
-    minWidth: "auto",
-    textAlign: "right",
-    display: "inline-block",
-  },
-  slider: {
-    width: "100%",
-    height: "8px",
-    borderRadius: "10px",
-    background: "#E5E7EB",
-    outline: "none",
-    cursor: "pointer",
-    appearance: "none",
-    WebkitAppearance: "none",
-    transition: "all 0.3s ease",
-    position: "relative",
-  },
-  sliderDeadline: {
-    background: "#E5E7EB",
-  },
-  sliderPayment: {
-    background: "#E5E7EB",
-  },
-  sliderDifficulty: {
-    background: "#E5E7EB",
-  },
-  sliderThumb: {
-    width: "24px",
-    height: "24px",
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #ffffff, #f8fafc)",
-    border: "3px solid #3B82F6",
-    cursor: "pointer",
-    boxShadow: "0 4px 8px rgba(59, 130, 246, 0.3), 0 0 0 4px rgba(59, 130, 246, 0.1)",
-    appearance: "none",
-    WebkitAppearance: "none",
-    transition: "all 0.3s ease",
-  },
-  projectSelection: {
-    marginBottom: "20px",
-    padding: "0 8px",
-    position: "relative",
-    zIndex: 10,
-  },
-  selectLabel: {
-    display: "block",
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#374151",
-    marginBottom: "8px",
-  },
-  select: {
-    width: "100%",
-    padding: "12px 16px",
-    border: "1px solid #D1D5DB",
-    borderRadius: "12px",
-    fontSize: "14px",
-    backgroundColor: "white",
-    cursor: "pointer",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-    outline: "none",
-    appearance: "none",
-    WebkitAppearance: "none",
-    MozAppearance: "none",
-    backgroundImage: "none",
-  },
-  calculateButton: {
-    width: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    padding: "16px 24px",
-    backgroundColor: "#3B82F6",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "16px",
-    fontWeight: "500",
-    boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.05), -6px -6px 12px rgba(255, 255, 255, 0.8)",
-    transition: "all 0.2s",
-  },
-  calculateButtonDisabled: {
-    backgroundColor: "#9CA3AF",
-    cursor: "not-allowed",
-  },
-  buttonSpinner: {
-    width: "20px",
-    height: "20px",
-    border: "2px solid transparent",
-    borderTop: "2px solid white",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  },
-  emptyResults: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "80px 24px",
+    color: "#1A202C",
+    margin: 0,
     textAlign: "center",
   },
-  emptyTitle: {
-    fontSize: "18px",
-    fontWeight: "600",
-    color: "#374151",
-    margin: "16px 0 8px 0",
+  cardContent: {
+    padding: "0 32px 32px 32px",
   },
-  emptyDescription: {
-    fontSize: "14px",
-    color: "#6B7280",
-    margin: 0,
-    maxWidth: "400px",
-    lineHeight: "1.5",
-  },
-  resultsList: {
+  projectsList: {
     display: "flex",
     flexDirection: "column",
-    gap: "16px",
+    gap: "20px",
+    maxHeight: "700px",
     overflowY: "auto",
-    flex: 1,
-    padding: "0 8px 8px 0",
-    maxHeight: "100%",
   },
-  resultItem: {
-    display: "flex",
-    gap: "16px",
-    padding: "20px",
-    border: "1px solid #E5E7EB",
+  projectCard: {
+    background: "linear-gradient(135deg, #FFFFFF 0%, #F8FAFF 100%)",
     borderRadius: "16px",
-    backgroundColor: "#FAFAFA",
-    boxShadow: "3px 3px 6px rgba(0, 0, 0, 0.05), -3px -3px 6px rgba(255, 255, 255, 0.8)",
+    padding: "28px",
+    boxShadow: "8px 8px 16px rgba(163, 177, 198, 0.12), -8px -8px 16px rgba(255, 255, 255, 0.8)",
+    border: "1px solid rgba(79, 156, 249, 0.1)",
   },
-  resultItem2: {
-    display: "flex",
-  },
-  resultRank: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "40px",
-    height: "40px",
-    backgroundColor: "#3B82F6",
-    color: "white",
-    borderRadius: "50%",
-    fontSize: "16px",
-    fontWeight: "bold",
-    flexShrink: 0,
-  },
-  resultContent: {
-    flex: 1,
-  },
-  resultHeader: {
+  cardMainContent: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: "8px",
   },
-  resultTitle: {
+  leftSection: {
+    flex: 1,
+    paddingRight: "24px",
+  },
+  rightSection: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    minWidth: "160px",
+  },
+  projectHeader: {
+    marginBottom: "16px",
+  },
+  projectTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    marginBottom: "6px",
+    flexWrap: "nowrap",
+  },
+  projectNumber: {
+    fontSize: "12px",
+    fontWeight: "700",
+    color: "#718096",
+    background: "linear-gradient(135deg, #F7F9FC 0%, #EEF4FF 100%)",
+    padding: "6px 10px",
+    borderRadius: "8px",
+    flexShrink: 0,
+    boxShadow: "2px 2px 4px rgba(163, 177, 198, 0.1), -2px -2px 4px rgba(255, 255, 255, 0.8)",
+  },
+  projectName: {
     fontSize: "18px",
+    fontWeight: "700",
+    color: "#1A202C",
+    margin: 0,
+    flexShrink: 0,
+  },
+  urgencyBadge: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    backgroundColor: "#FFF7ED",
+    padding: "4px 8px",
+    borderRadius: "8px",
+    border: "1px solid #FED7AA",
+    flexShrink: 0,
+    marginLeft: "8px",
+  },
+  urgencyBadgeText: {
+    fontSize: "10px",
     fontWeight: "600",
-    color: "#1F2937",
+    color: "#FDBA74",
+    whiteSpace: "nowrap",
+  },
+  clientName: {
+    fontSize: "14px",
+    fontWeight: "400",
+    color: "#718096",
     margin: 0,
   },
-  resultScore: {
+  factorBadges: {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+    marginBottom: "16px",
+  },
+  factorBadge: {
+    padding: "6px 12px",
+    borderRadius: "16px",
+    fontSize: "12px",
+    fontWeight: "500",
+    boxShadow: "2px 2px 4px rgba(163, 177, 198, 0.1), -2px -2px 4px rgba(255, 255, 255, 0.8)",
+  },
+  detailsSection: {
+    display: "flex",
+    justifyContent: "flex-start",
+  },
+  detailsButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    background: "linear-gradient(135deg, #F8FAFF 0%, #EEF4FF 100%)",
+    border: "1px solid rgba(79, 156, 249, 0.2)",
+    color: "#4F9CF9",
+    fontSize: "14px",
+    fontWeight: "500",
+    cursor: "pointer",
+    padding: "8px 16px",
+    borderRadius: "10px",
+    transition: "all 0.2s ease",
+    boxShadow: "4px 4px 8px rgba(163, 177, 198, 0.1), -4px -4px 8px rgba(255, 255, 255, 0.8)",
+  },
+  scoreContainer: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     textAlign: "center",
+    padding: "20px",
+    background: "linear-gradient(135deg, #F8FAFF 0%, #EEF4FF 100%)",
+    borderRadius: "16px",
+    boxShadow: "inset 2px 2px 6px rgba(163, 177, 198, 0.1), inset -2px -2px 6px rgba(255, 255, 255, 0.9)",
+    border: "1px solid rgba(79, 156, 249, 0.1)",
+    minWidth: "140px",
+  },
+  scoreCircle: {
+    width: "80px",
+    height: "80px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #4F9CF9 0%, #2B77E5 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: "12px",
+    boxShadow: "0 4px 12px rgba(79, 156, 249, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
   },
   scoreValue: {
     fontSize: "24px",
-    fontWeight: "bold",
-    color: "#1F2937",
-  },
-  scoreLabel: {
-    fontSize: "12px",
-    color: "#6B7280",
-  },
-  resultClient: {
-    fontSize: "14px",
-    color: "#6B7280",
-    margin: "0 0 12px 0",
-  },
-  resultFactors: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "12px",
-    flexWrap: "wrap",
-  },
-  factorBadge: {
-    padding: "4px 12px",
-    borderRadius: "20px",
-    fontSize: "12px",
-    fontWeight: "500",
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
   },
   progressContainer: {
-    width: "100%",
+    width: "100px",
+    marginBottom: "8px",
   },
   progressBar: {
     width: "100%",
     height: "8px",
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#E2E8F0",
     borderRadius: "4px",
     overflow: "hidden",
+    boxShadow: "inset 0 1px 3px rgba(0, 0, 0, 0.1)",
   },
   progressFill: {
     height: "100%",
+    background: "linear-gradient(90deg, #4F9CF9 0%, #2B77E5 50%, #1E5FCC 100%)",
     borderRadius: "4px",
     transition: "width 0.3s ease",
+    boxShadow: "0 1px 2px rgba(79, 156, 249, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+    position: "relative",
+  },
+  scoreLabel: {
+    fontSize: "11px",
+    fontWeight: "500",
+    color: "#718096",
+  },
+  reasoningSection: {
+    marginTop: "20px",
+    padding: "20px",
+    background: "linear-gradient(135deg, #F7F9FC 0%, #EEF4FF 100%)",
+    borderRadius: "12px",
+    boxShadow: "inset 2px 2px 6px rgba(163, 177, 198, 0.1), inset -2px -2px 6px rgba(255, 255, 255, 0.9)",
+    border: "1px solid rgba(79, 156, 249, 0.1)",
+  },
+  reasoningText: {
+    fontSize: "14px",
+    fontWeight: "400",
+    color: "#1A202C",
+    lineHeight: "1.6",
+    margin: "0 0 12px 0",
+  },
+  reasoningList: {
+    fontSize: "14px",
+    fontWeight: "400",
+    color: "#1A202C",
+    lineHeight: "1.6",
+    margin: "12px 0",
+    paddingLeft: "20px",
+  },
+  searchSection: {
+    marginBottom: "24px",
+  },
+  searchContainer: {
+    position: "relative",
+    maxWidth: "500px",
+  },
+  searchIcon: {
+    position: "absolute",
+    left: "16px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 1,
+  },
+  searchInput: {
+    width: "100%",
+    padding: "16px 16px 16px 48px",
+    fontSize: "16px",
+    fontWeight: "400",
+    color: "#374151",
+    backgroundColor: "white",
+    border: "1px solid #E5E7EB",
+    borderRadius: "16px",
+    outline: "none",
+    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+    transition: "all 0.2s ease",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+  clearButton: {
+    position: "absolute",
+    right: "16px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: "4px",
+    borderRadius: "4px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "background-color 0.2s ease",
+  },
+  emptySearchState: {
+    textAlign: "center",
+    padding: "60px 20px",
+    backgroundColor: "white",
+    borderRadius: "16px",
+    boxShadow: "8px 8px 16px rgba(163, 177, 198, 0.12), -8px -8px 16px rgba(255, 255, 255, 0.8)",
+    border: "1px solid rgba(79, 156, 249, 0.1)",
+  },
+  emptySearchIcon: {
+    fontSize: "48px",
+    marginBottom: "16px",
+  },
+  emptySearchTitle: {
+    fontSize: "20px",
+    fontWeight: "600",
+    color: "#1A202C",
+    margin: "0 0 8px 0",
+  },
+  emptySearchDescription: {
+    fontSize: "14px",
+    color: "#718096",
+    margin: "0 0 24px 0",
+    lineHeight: "1.5",
+  },
+  clearSearchButton: {
+    padding: "12px 24px",
+    backgroundColor: "#4F9CF9",
+    color: "white",
+    border: "none",
+    borderRadius: "12px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    transition: "all 0.2s ease",
+    boxShadow: "0 4px 12px rgba(79, 156, 249, 0.3)",
   },
 }
 

@@ -422,15 +422,19 @@ What would you like to discuss about your projects today?`
     })
   }
 
-  // Typewriter effect function
-  const typewriterEffect = (text, messageId, delay = 0.5) => {
+  // Typewriter effect function - very fast typing
+  const typewriterEffect = (text, messageId, delay = 1) => {
     return new Promise((resolve) => {
       let currentIndex = 0
       setIsRevealing(true)
       setRevealingMessageId(messageId)
       
-      const typeNextChar = () => {
+      const typeNextChunk = () => {
         if (currentIndex <= text.length) {
+          // Type 3-5 characters at once for very fast effect
+          const chunkSize = Math.min(5, text.length - currentIndex)
+          currentIndex += chunkSize
+          
           const partialText = text.substring(0, currentIndex)
           
           setMessages(prev => prev.map(msg => 
@@ -439,10 +443,8 @@ What would you like to discuss about your projects today?`
               : msg
           ))
           
-          currentIndex++
-          
-          if (currentIndex <= text.length) {
-            typewriterTimeoutRef.current = setTimeout(typeNextChar, delay)
+          if (currentIndex < text.length) {
+            typewriterTimeoutRef.current = setTimeout(typeNextChunk, delay)
           } else {
             setIsRevealing(false)
             setRevealingMessageId(null)
@@ -451,7 +453,7 @@ What would you like to discuss about your projects today?`
         }
       }
       
-      typeNextChar()
+      typeNextChunk()
     })
   }
 
