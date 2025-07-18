@@ -46,6 +46,45 @@ export default function ProjectManagementPage() {
     direction: 'asc'
   });
 
+  // Function to calculate optimal context menu position
+  const calculateMenuPosition = (clickX, clickY) => {
+    const menuWidth = 144; // w-36 = 144px
+    const menuHeight = 80; // Approximate height for 2 menu items
+    const padding = 8; // Minimum distance from viewport edge
+    
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    let x = clickX;
+    let y = clickY;
+    
+    // Check if menu would overflow on the right
+    if (clickX + menuWidth + padding > viewportWidth) {
+      // Position menu to the left of the click point
+      x = clickX - menuWidth;
+      // Ensure it doesn't go off the left edge
+      if (x < padding) {
+        x = padding;
+      }
+    }
+    
+    // Check if menu would overflow on the bottom
+    if (clickY + menuHeight + padding > viewportHeight) {
+      // Position menu above the click point
+      y = clickY - menuHeight;
+      // Ensure it doesn't go off the top edge
+      if (y < padding) {
+        y = padding;
+      }
+    }
+    
+    // Ensure minimum padding from edges
+    x = Math.max(padding, Math.min(x, viewportWidth - menuWidth - padding));
+    y = Math.max(padding, Math.min(y, viewportHeight - menuHeight - padding));
+    
+    return { x, y };
+  };
+
   // Check authentication and fetch projects
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -87,13 +126,11 @@ export default function ProjectManagementPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("projects")
-        .select(
-          `
+        .select(`
           *,
           type_id:type_id ( type_name ),
           status_id:status_id ( status_name )
-        `
-        )
+        `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -256,10 +293,12 @@ export default function ProjectManagementPage() {
           sortConfig={sortConfig}
           onSort={handleSort}
           onContextAction={(project, position) => {
+            // Calculate optimal position for the context menu
+            const optimalPosition = calculateMenuPosition(position.x, position.y);
             setContextMenu({
               visible: true,
-              x: position.x,
-              y: position.y,
+              x: optimalPosition.x,
+              y: optimalPosition.y,
               project,
             });
           }}
@@ -392,14 +431,14 @@ export default function ProjectManagementPage() {
 
       {contextMenu.visible && (
         <div
-          className="absolute z-50 bg-white border border-gray-100 rounded-lg shadow-md w-36"
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-36"
           style={{
             top: contextMenu.y,
             left: contextMenu.x,
           }}
         >
           <button
-            className=" flex items-center w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg"
+            className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-50 rounded-t-lg transition-colors"
             onClick={async () => {
               setContextMenu((prev) => ({ ...prev, visible: false }));
               setEditFormLoading(true);
@@ -432,18 +471,18 @@ export default function ProjectManagementPage() {
               }
             }}
           >
-            <Pencil className="w-4 h-4 mr-3" />
-            Edit
+            <Pencil className="w-4 h-4 mr-3 text-gray-600" />
+            <span className="text-gray-700">Edit</span>
           </button>
           <button
-            className="flex items-center w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
+            className="flex items-center w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-b-lg transition-colors"
             onClick={() => {
               setContextMenu((prev) => ({ ...prev, visible: false }));
               setShowDeleteConfirm(true);
             }}
           >
             <Trash2 className="w-4 h-4 mr-3" />
-            Delete
+            <span>Delete</span>
           </button>
         </div>
       )}
@@ -478,7 +517,7 @@ export default function ProjectManagementPage() {
                     setDeleteLoading(false);
                   }
                 }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-red-700"
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
               >
                 {deleteLoading ? "Deleting..." : "Delete"}
               </button>

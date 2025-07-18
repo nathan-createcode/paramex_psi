@@ -34,7 +34,16 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="relative min-h-screen flex items-center justify-center bg-white">
+      {/* Tombol kecil gradasi biru-ungu di pojok kiri atas */}
+      <button
+  onClick={() => navigate("/")}
+  className="absolute top-4 left-4 px-4 py-1.5 text-sm text-white font-medium rounded-md bg-black hover:bg-gray-800 transition"
+>
+  ← Landing Page
+</button>
+
+
       <div className="flex flex-col lg:flex-row w-full max-w-6xl p-4 lg:p-0">
         {/* Form Login */}
         <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 lg:px-16 py-12">
@@ -114,7 +123,6 @@ const LoginPage = () => {
         </div>
 
         {/* Gambar Login */}
-
         <img
           src={gambarLogin}
           alt="Login Illustration"

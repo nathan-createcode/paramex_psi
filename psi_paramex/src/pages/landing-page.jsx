@@ -91,7 +91,7 @@ const LandingPage = () => {
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
     <div className="pl-8"> 
       <h1 className="text-4xl md:text-5xl font-bold text-gray-800 leading-tight mb-6">
-        Manage your freelance projects smarter with MIS, DSS & AI
+        Manage your freelance projects smarter with AI
       </h1>
       <p className="text-lg text-gray-600 mb-8">
         Streamline your workflow, prioritize tasks intelligently, and make data-driven decisions with our

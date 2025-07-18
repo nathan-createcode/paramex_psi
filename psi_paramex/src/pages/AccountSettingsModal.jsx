@@ -423,23 +423,7 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
                   placeholder="Enter your company name"
                 />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", gridColumn: "span 2" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>
-                  Maximum Projects Per Month
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={formData.maxProjectsPerMonth}
-                  onChange={(e) => handleInputChange("maxProjectsPerMonth", e.target.value)}
-                  style={styles.input}
-                  placeholder="Enter maximum projects per month"
-                />
-                <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>
-                  Set a monthly limit to help manage your workload (1-50 projects)
-                </p>
-              </div>
+              
             </div>
             <button 
               style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
