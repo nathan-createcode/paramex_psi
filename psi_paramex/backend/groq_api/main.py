@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uvicorn
-from groq_client import groq_client
+
 from scoring_logic import project_scorer
 from ux_safety_check import ux_safety_checker
 from supabase_email_service import SupabaseEmailService, EmailData
@@ -13,6 +13,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from datetime import datetime
 import pytz
+from groq_client import GroqLlamaClient
 
 # Load environment variables from parent directory (psi_paramex/.env)
 load_dotenv(dotenv_path="../../.env")
@@ -42,6 +43,9 @@ try:
 except Exception as e:
     print(f"⚠️ Warning: Could not initialize Supabase client: {e}")
     print("Project context features will be disabled")
+
+# Initialize optimized Groq client with balanced performance
+groq_client = GroqLlamaClient(performance_mode="balanced")  # Better for project context analysis
 
 # Configure CORS
 app.add_middleware(
@@ -172,77 +176,90 @@ async def chat_with_advisor(request: ChatRequest):
         current_datetime = datetime.now(jakarta_tz)
         current_date_context = f"\n\nCurrent Date & Time: {current_datetime.strftime('%A, %B %d, %Y at %I:%M %p')} (Jakarta Time)\n"
         
-        # Get user projects for context if user_id is provided
+        # Enhanced project context with better keyword detection
         project_context = ""
-        project_summary = ""
-        if request.user_id and supabase:
+        project_keywords = [
+            "project", "deadline", "workload", "client", "status", "timeline", 
+            "progress", "task", "work", "busy", "schedule", "priority", "urgent",
+            "review", "current", "ongoing", "active", "completed", "finished"
+        ]
+        
+        # Check if user is asking about projects (more flexible detection)
+        should_fetch_projects = (
+            request.user_id and supabase and 
+            (any(keyword in request.message.lower() for keyword in project_keywords) or
+             len(request.message.split()) <= 3 or  # Short questions often about status
+             "?" in request.message)  # Questions often need project context
+        )
+        
+        if should_fetch_projects:
+            matched_keywords = [kw for kw in project_keywords if kw in request.message.lower()]
+            print(f"🔍 Project context triggered - Keywords: {matched_keywords if matched_keywords else 'short question/question mark'}")
+            
             try:
-                print(f"🔍 Getting projects for user: {request.user_id}")
-                print(f"🔗 Supabase connection status: {supabase is not None}")
-                
+                print(f"🔍 Getting project context for user: {request.user_id}")
                 projects_response = await get_user_projects(request.user_id)
-                print(f"📈 Projects response: {projects_response}")
                 
                 if projects_response.get("projects") and len(projects_response["projects"]) > 0:
-                    print(f"📊 Found {len(projects_response['projects'])} projects for user")
-                    project_context = "Your Current Projects:\n"
-                    active_projects = 0
-                    overdue_projects = 0
-                    urgent_projects = 0
+                    projects = projects_response["projects"]
+                    print(f"📊 Found {len(projects)} projects for user")
                     
-                    for project in projects_response["projects"]:
-                        # Calculate days until deadline
+                    # Enhanced context with key project details - FIXED STATUS LOGIC
+                    active_projects = [p for p in projects if p['status'] != 'Done']  # Only exclude "Done" projects
+                    urgent_projects = []
+                    overdue_projects = []
+                    
+                    print(f"🔍 Active projects: {len(active_projects)} (excluding Done status)")
+                    print(f"🔍 Project statuses: {[p['status'] for p in projects]}")
+                    
+                    # Calculate urgency and overdue status - ONLY FOR ACTIVE PROJECTS
+                    for project in active_projects:
                         try:
-                            deadline_date = datetime.strptime(project['deadline'], '%Y-%m-%d')
-                            days_until_deadline = (deadline_date - current_datetime.replace(tzinfo=None)).days
-                            deadline_info = f"Deadline: {project['deadline']}"
-                            
-                            if days_until_deadline >= 0:
-                                deadline_info += f" ({days_until_deadline} days remaining)"
-                                if days_until_deadline <= 7:
-                                    urgent_projects += 1
-                                    deadline_info += " ⚠️ URGENT"
-                            else:
-                                deadline_info += f" ({abs(days_until_deadline)} days overdue) ❌ OVERDUE"
-                                overdue_projects += 1
-                            
-                            if project['status'].lower() not in ['completed', 'cancelled']:
-                                active_projects += 1
+                            if project['deadline']:
+                                deadline_date = datetime.strptime(project['deadline'], '%Y-%m-%d')
+                                days_until = (deadline_date - current_datetime.replace(tzinfo=None)).days
                                 
-                        except Exception as date_error:
-                            print(f"⚠️ Date parsing error for project {project.get('name', 'Unknown')}: {date_error}")
-                            deadline_info = f"Deadline: {project['deadline']}"
-                        
-                        # Add start date info
-                        start_date_info = f"Start: {project['start_date']}" if project['start_date'] else "Start: Not specified"
-                        
-                        # Format project info with more detail
-                        project_context += f"- {project['name']} (Client: {project['client']}, Status: {project['status']}, Type: {project['type']}, Difficulty: {project['difficulty']}/5, Payment: ${project['payment']}, {start_date_info}, {deadline_info})\n"
+                                if days_until < 0:
+                                    overdue_projects.append(project['name'])
+                                    print(f"📍 Overdue project: {project['name']} (deadline: {project['deadline']}, days past: {abs(days_until)})")
+                                elif days_until <= 7:
+                                    urgent_projects.append(project['name'])
+                                    print(f"⚠️ Urgent project: {project['name']} (deadline: {project['deadline']}, days left: {days_until})")
+                        except Exception as e:
+                            print(f"⚠️ Date parsing error for project {project['name']}: {e}")
+                            pass
                     
-                    # Add project summary for AI
-                    project_summary = f"Project Summary: You have {len(projects_response['projects'])} total projects, {active_projects} active, {urgent_projects} urgent (deadline ≤7 days), {overdue_projects} overdue."
+                    # Build informative context
+                    context_parts = [
+                        f"User has {len(projects)} total projects, {len(active_projects)} active"
+                    ]
                     
-                    if urgent_projects > 0:
-                        project_summary += f" ⚠️ You have {urgent_projects} urgent project(s) that need immediate attention!"
-                    if overdue_projects > 0:
-                        project_summary += f" ❌ You have {overdue_projects} overdue project(s) that need urgent action!"
-                        
+                    if urgent_projects:
+                        context_parts.append(f"Urgent (≤7 days): {', '.join(urgent_projects[:3])}")
+                    
+                    if overdue_projects:
+                        context_parts.append(f"Overdue: {', '.join(overdue_projects[:3])}")
+                    
+                    # Add project types if diverse
+                    project_types = list(set([p['type'] for p in projects if p['type'] != 'Unknown']))
+                    if len(project_types) > 1:
+                        context_parts.append(f"Types: {', '.join(project_types[:3])}")
+                    
+                    project_context = ". ".join(context_parts) + "."
+                    print(f"✅ Project context built: {project_context}")
+                    
                 else:
-                    print("📭 No projects found for user - response was empty or no projects")
-                    project_context = "You don't have any projects in the system yet. I can help you plan new projects or discuss general project management strategies."
+                    project_context = "User has no projects in the system yet."
+                    print(f"📭 No projects found for user")
                     
             except Exception as e:
-                print(f"❌ Failed to get project context - Full error: {str(e)}")
-                print(f"❌ Error type: {type(e).__name__}")
-                import traceback
-                print(f"❌ Full traceback: {traceback.format_exc()}")
-                project_context = "I'm having trouble accessing your project data right now, but I can still help with general project management advice."
-        elif not request.user_id:
-            print("⚠️ No user_id provided in request")
-            project_context = "No user ID provided - please make sure you're logged in to access your project data."
-        elif not supabase:
-            print("⚠️ No supabase connection available") 
-            project_context = "Database connection not available - project data cannot be accessed."
+                print(f"❌ Failed to get project context: {str(e)}")
+                project_context = ""
+        else:
+            print(f"⏭️ Skipping project context - No relevant keywords or conditions met")
+            print(f"   Message: '{request.message}'")
+            print(f"   User ID: {request.user_id}")
+            print(f"   Supabase: {supabase is not None}")
         
         # Convert conversation history to the format expected by groq_client
         history = []
@@ -256,13 +273,13 @@ async def chat_with_advisor(request: ChatRequest):
         # Enhanced message with better context
         enhanced_message = f"{request.message}"
         
-        # Always add current time context for AI awareness (but subtle)
-        enhanced_message += f"\n\n[Context: Current time is {current_datetime.strftime('%A, %B %d, %Y at %I:%M %p')} Jakarta time]"
+        # Add time context only if relevant
+        if any(time_word in request.message.lower() for time_word in ['today', 'now', 'current', 'when', 'time', 'date']):
+            enhanced_message += f"\n\n[Current time: {current_datetime.strftime('%A, %B %d, %Y at %I:%M %p')} Jakarta time]"
         
-        # Always include project context if available (AI will decide when to use it)
-        if project_context.strip() and request.user_id:
-            enhanced_message += f"\n\n[Project Database Access: {project_summary.strip()}]"
-            enhanced_message += f"\n[Your Projects: {project_context.strip()}]"
+        # Include project context if available and relevant
+        if project_context.strip():
+            enhanced_message += f"\n\n[Project Status: {project_context.strip()}]"
         
         print(f"🤖 Sending message to AI: {request.message[:100]}...")
         

@@ -14,10 +14,29 @@ const ProjectAdvisor = () => {
       if (savedMessages) {
         const parsedMessages = JSON.parse(savedMessages)
         // Convert timestamp strings back to Date objects
-        return parsedMessages.map(msg => ({
+        const messagesWithDates = parsedMessages.map(msg => ({
           ...msg,
           timestamp: new Date(msg.timestamp)
         }))
+        
+        // Check if we need to update the default message (remove old project alerts)
+        if (messagesWithDates.length === 1 && messagesWithDates[0].id === 1 && messagesWithDates[0].type === "ai") {
+          const content = messagesWithDates[0].content
+          // If it contains old project access mentions, replace with new message
+          if (content.includes("I have access to your") || content.includes("📊 Project Alert") || content.includes("overdue")) {
+            console.log('🔄 Updating cached default message to remove project alerts')
+            return [
+              {
+                id: 1,
+                type: "ai",
+                content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. What would you like to discuss today?",
+                timestamp: new Date(),
+              },
+            ]
+          }
+        }
+        
+        return messagesWithDates
       }
     } catch (error) {
       console.error('Error loading saved messages:', error)
@@ -28,7 +47,7 @@ const ProjectAdvisor = () => {
       {
         id: 1,
         type: "ai",
-        content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. I have access to your current projects and can provide personalized advice based on your actual workload, deadlines, and project mix. What would you like to discuss today?",
+        content: "Hello! I'm your AI Project Advisor powered by Meta Llama. I can help you with project management strategies, prioritization, time management, and workflow optimization. What would you like to discuss today?",
         timestamp: new Date(),
       },
     ]
@@ -243,7 +262,7 @@ const ProjectAdvisor = () => {
     const defaultMessage = {
       id: 1,
       type: "ai",
-      content: `Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization.${userProjects.length > 0 ? ` I have access to your ${userProjects.length} current project${userProjects.length !== 1 ? 's' : ''} and can provide personalized advice.` : ''}`,
+      content: "Hello! I'm your AI Project Advisor. I can help you with project management strategies, prioritization, time management, and workflow optimization. What would you like to discuss today?",
       timestamp: new Date(),
     }
     setMessages([defaultMessage])
@@ -338,6 +357,8 @@ const ProjectAdvisor = () => {
       
       setSavedSessions([])
       localStorage.removeItem('projectAdvisorSessions')
+      localStorage.removeItem('projectAdvisorMessages') // Also clear current messages
+      localStorage.removeItem('projectAdvisorCurrentSessionId') // Clear session ID
       clearChatHistory()
       
       // Reset the flag after a short delay to allow state updates to complete
@@ -382,10 +403,7 @@ const ProjectAdvisor = () => {
         setUserProjects(data.projects || [])
         console.log(`✅ Loaded ${data.projects?.length || 0} projects for AI context:`, data.projects)
         
-        // Update the default AI message with project context
-        if (data.projects?.length > 0) {
-          updateDefaultMessage(data.projects)
-        }
+        // Projects loaded for AI context but no default message update needed
       } else {
         console.error('❌ Failed to fetch projects:', response.status, response.statusText)
       }
@@ -394,59 +412,7 @@ const ProjectAdvisor = () => {
     }
   }
 
-  // Update default AI message with project context
-  const updateDefaultMessage = (projects) => {
-    const urgentProjects = projects.filter(p => {
-      try {
-        const deadline = new Date(p.deadline)
-        const now = new Date()
-        const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
-        return daysUntil <= 7 && daysUntil >= 0
-      } catch {
-        return false
-      }
-    }).length
 
-    const overdueProjects = projects.filter(p => {
-      try {
-        const deadline = new Date(p.deadline)
-        const now = new Date()
-        return deadline < now
-      } catch {
-        return false
-      }
-    }).length
-
-    let contextMessage = `Hello! I'm your AI Project Advisor powered by Meta Llama. I have access to your ${projects.length} current project${projects.length !== 1 ? 's' : ''} and can provide personalized advice based on your actual workload, deadlines, and project mix.`
-    
-    if (urgentProjects > 0 || overdueProjects > 0) {
-      contextMessage += ` 
-
-📊 Project Alert: `
-      if (overdueProjects > 0) {
-        contextMessage += `${overdueProjects} project(s) are overdue and need immediate attention! `
-      }
-      if (urgentProjects > 0) {
-        contextMessage += `${urgentProjects} project(s) have urgent deadlines (≤7 days). `
-      }
-      contextMessage += `I can help you prioritize and create action plans.`
-    }
-
-    contextMessage += `
-
-What would you like to discuss about your projects today?`
-
-    // Only update if this is the initial default message
-    setMessages(prevMessages => {
-      if (prevMessages.length === 1 && prevMessages[0].id === 1) {
-        return [{
-          ...prevMessages[0],
-          content: contextMessage
-        }]
-      }
-      return prevMessages
-    })
-  }
 
   // Typewriter effect function - very fast typing
   const typewriterEffect = (text, messageId, delay = 1) => {
@@ -617,16 +583,8 @@ What would you like to discuss about your projects today?`
     "Tips for managing project scope creep?",
     "How to handle difficult project deadlines?",
     "Best practices for freelance project management?",
-    // Add context-aware questions based on user projects
-    ...(userProjects.length > 0 ? [
-      "Review my current project workload and priorities",
-      "Which of my projects needs immediate attention?",
-      "How should I handle my overdue projects?",
-      "Help me plan my schedule for the next week"
-    ] : [
-      "How do I get started with freelance project management?",
-      "What tools should I use for project tracking?"
-    ])
+    "How do I get started with freelance project management?",
+    "What tools should I use for project tracking?"
   ]
 
   const handleQuickQuestion = async (question) => {
@@ -840,39 +798,6 @@ What would you like to discuss about your projects today?`
                 </div>
                 <p style={styles.chatSubtitle}>
                   Get intelligent advice for your freelance project management
-                  {userProjects.length > 0 ? (
-                    <span style={styles.projectContext}>
-                      • AI has real-time access to {userProjects.length} project{userProjects.length !== 1 ? 's' : ''} 
-                      {(() => {
-                        const now = new Date()
-                        const urgentCount = userProjects.filter(p => {
-                          try {
-                            const deadline = new Date(p.deadline)
-                            const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
-                            return daysUntil <= 7 && daysUntil >= 0
-                          } catch { return false }
-                        }).length
-                        
-                        const overdueCount = userProjects.filter(p => {
-                          try {
-                            const deadline = new Date(p.deadline)
-                            return deadline < now
-                          } catch { return false }
-                        }).length
-                        
-                        if (overdueCount > 0) {
-                          return ` • ${overdueCount} overdue ❌`
-                        } else if (urgentCount > 0) {
-                          return ` • ${urgentCount} urgent ⚠️`
-                        }
-                        return ' ✅'
-                      })()}
-                    </span>
-                  ) : (
-                    <span style={styles.noProjectsContext}>
-                      • AI ready to help plan your projects
-                    </span>
-                  )}
                 </p>
               </div>
             </div>
@@ -1214,20 +1139,7 @@ const styles = {
     color: "#64748B",
     margin: 0,
   },
-  projectContext: {
-    display: "block",
-    fontSize: "0.75rem",
-    color: "#10B981",
-    fontWeight: "500",
-    marginTop: "0.25rem",
-  },
-  noProjectsContext: {
-    display: "block",
-    fontSize: "0.75rem",
-    color: "#64748B",
-    fontWeight: "500",
-    marginTop: "0.25rem",
-  },
+
   
   // Chat Container
   chatContainer: {

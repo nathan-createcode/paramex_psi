@@ -8,15 +8,38 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class GroqLlamaClient:
-    def __init__(self):
-        """Initialize Groq client with Meta Llama 4 Scout model"""
+    def __init__(self, performance_mode="balanced"):
+        """
+        Initialize Groq client with Meta Llama models
+        
+        Args:
+            performance_mode: "fast", "balanced", or "quality"
+        """
         self.api_key = os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY environment variable is required")
         
         self.client = Groq(api_key=self.api_key)
-        self.model = "meta-llama/llama-4-scout-17b-16e-instruct"  # Using more conversational model
-        # Note: Using Llama 3.1 70B which is better for conversations
+        
+        # Configure model and parameters based on performance mode
+        if performance_mode == "fast":
+            self.model = "meta-llama/llama-4-scout-17b-16e-instruct"
+            self.max_tokens = 300
+            self.temperature = 0.6
+            self.top_p = 0.7
+            self.history_length = 2
+        elif performance_mode == "quality":
+            self.model = "meta-llama/llama-4-scout-17b-16e-instruct"
+            self.max_tokens = 800
+            self.temperature = 0.8
+            self.top_p = 0.9
+            self.history_length = 6
+        else:  # balanced (default)
+            self.model = "meta-llama/llama-4-scout-17b-16e-instruct"
+            self.max_tokens = 500
+            self.temperature = 0.7
+            self.top_p = 0.8
+            self.history_length = 4
         
         # System prompt for project advisory
         self.system_prompt = """You are a helpful AI assistant who can help with freelance project management topics. 
@@ -66,22 +89,22 @@ Most important: Respond to what the user is actually asking about. Don't always 
             # Prepare messages for the API
             messages = [{"role": "system", "content": self.system_prompt}]
             
-            # Add conversation history if provided
+            # Add conversation history if provided (reduced context for speed)
             if conversation_history:
-                for msg in conversation_history[-6:]:  # Last 6 messages for context (reduced from 10)
+                for msg in conversation_history[-self.history_length:]:
                     role = "user" if msg["type"] == "user" else "assistant"
                     messages.append({"role": role, "content": msg["content"]})
             
             # Add current user message
             messages.append({"role": "user", "content": user_message})
             
-            # Call Groq API
+            # Call Groq API with optimized parameters
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.8,
-                max_tokens=800,  # Increased for more natural responses
-                top_p=0.9,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
                 stream=False
             )
             
@@ -132,9 +155,9 @@ Most important: Respond to what the user is actually asking about. Don't always 
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=1200,
-                top_p=0.9,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
                 stream=False
             )
             
@@ -175,9 +198,9 @@ Most important: Respond to what the user is actually asking about. Don't always 
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.8,
-                max_tokens=600,  # Increased for better responses
-                top_p=0.9,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
                 stream=False
             )
             

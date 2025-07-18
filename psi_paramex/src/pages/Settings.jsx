@@ -274,9 +274,7 @@ const Settings = () => {
                   value={settings.theme}
                   onChange={(value) => handleSettingChange("theme", value)}
                   options={[
-                    { value: "light", label: "Light" },
-                    { value: "dark", label: "Dark" },
-                    { value: "system", label: "System" }
+                    { value: "light", label: "Light" }
                   ]}
                   placeholder="Select theme"
                   className="min-w-[150px]"
@@ -434,10 +432,7 @@ const Settings = () => {
                   value={settings.language}
                   onChange={(value) => handleSettingChange("language", value)}
                   options={[
-                    { value: "en", label: "English" },
-                    { value: "id", label: "Bahasa Indonesia" },
-                    { value: "es", label: "Español" },
-                    { value: "fr", label: "Français" }
+                    { value: "en", label: "English" }
                   ]}
                   placeholder="Select language"
                   className="min-w-[150px]"
@@ -453,10 +448,7 @@ const Settings = () => {
                   value={settings.timezone}
                   onChange={(value) => handleSettingChange("timezone", value)}
                   options={[
-                    { value: "UTC", label: "UTC" },
-                    { value: "Asia/Jakarta", label: "Asia/Jakarta (WIB)" },
-                    { value: "America/New_York", label: "America/New_York (EST)" },
-                    { value: "Europe/London", label: "Europe/London (GMT)" }
+                    { value: "UTC", label: "UTC" }
                   ]}
                   placeholder="Select timezone"
                   className="min-w-[150px]"
@@ -472,10 +464,7 @@ const Settings = () => {
                   value={settings.currency}
                   onChange={(value) => handleSettingChange("currency", value)}
                   options={[
-                    { value: "USD", label: "USD ($)" },
-                    { value: "IDR", label: "IDR (Rp)" },
-                    { value: "EUR", label: "EUR (€)" },
-                    { value: "GBP", label: "GBP (£)" }
+                    { value: "USD", label: "USD ($)" }
                   ]}
                   placeholder="Select currency"
                   className="min-w-[150px]"
