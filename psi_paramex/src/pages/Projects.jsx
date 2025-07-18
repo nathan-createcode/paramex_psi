@@ -20,7 +20,7 @@ export default function ProjectManagementPage() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
-    status: "all",
+    status: "To Do",
     difficulty: "all",
     deadline: "all",
   });
