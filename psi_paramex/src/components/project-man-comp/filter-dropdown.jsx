@@ -45,7 +45,7 @@ export default function FilterDropdown({
 
       {isOpen && (
         <div 
-          className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 transition-all duration-200 ease-out"
+          className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-[70] py-2 transition-all duration-200 ease-out"
           style={{
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             animation: 'dropIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)'

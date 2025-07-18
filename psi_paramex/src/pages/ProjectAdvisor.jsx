@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
-import { BotMessageSquare, History, Save, Trash2, Plus, FolderOpen } from "lucide-react"
+import { BotMessageSquare, Menu, Save, Trash2, Plus, FolderOpen } from "lucide-react"
 
 const ProjectAdvisor = () => {
   // Load messages from localStorage or use default
@@ -60,6 +60,7 @@ const ProjectAdvisor = () => {
   })
   const [showHistoryPanel, setShowHistoryPanel] = useState(true)
   const [isLoadingSession, setIsLoadingSession] = useState(false)
+  const [isDeletingSession, setIsDeletingSession] = useState(false)
   
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
@@ -140,11 +141,11 @@ const ProjectAdvisor = () => {
         messageCount: messages.length,
         isLoadingSession,
         sessionId: sessionIdRef.current,
-        shouldAutoSave: messages.length > 1 && !isLoadingSession
+        shouldAutoSave: messages.length > 1 && !isLoadingSession && !isDeletingSession
       })
       
       // Auto-save session when there are actual conversation messages (more than just the initial AI greeting)
-      if (messages.length > 1 && !isLoadingSession) {
+      if (messages.length > 1 && !isLoadingSession && !isDeletingSession) {
         // Clear existing timeout to debounce auto-save
         if (autoSaveTimeoutRef.current) {
           clearTimeout(autoSaveTimeoutRef.current)
@@ -159,7 +160,7 @@ const ProjectAdvisor = () => {
     } catch (error) {
       console.error('Error saving messages to localStorage:', error)
     }
-  }, [messages, isLoadingSession])
+  }, [messages, isLoadingSession, isDeletingSession])
 
   // Auto-save function
   const autoSaveCurrentSession = () => {
@@ -310,6 +311,8 @@ const ProjectAdvisor = () => {
   
   const deleteSession = (sessionId) => {
     if (window.confirm('Are you sure you want to delete this conversation?')) {
+      setIsDeletingSession(true)
+      
       const updatedSessions = savedSessions.filter(s => s.id !== sessionId)
       // Sort by createdAt to maintain consistent order
       const sortedSessions = updatedSessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -321,29 +324,52 @@ const ProjectAdvisor = () => {
       if (sessionIdRef.current === sessionId) {
         clearChatHistory()
       }
+      
+      // Reset the flag after a short delay to allow state updates to complete
+      setTimeout(() => {
+        setIsDeletingSession(false)
+      }, 100)
     }
   }
   
   const clearAllHistory = () => {
     if (window.confirm('Are you sure you want to delete ALL conversation history? This action cannot be undone.')) {
+      setIsDeletingSession(true)
+      
       setSavedSessions([])
       localStorage.removeItem('projectAdvisorSessions')
       clearChatHistory()
+      
+      // Reset the flag after a short delay to allow state updates to complete
+      setTimeout(() => {
+        setIsDeletingSession(false)
+      }, 100)
     }
   }
   
 
   
   const createNewSession = () => {
+    setIsDeletingSession(true)
+    
     clearChatHistory()
     setCurrentSessionId(null)
     sessionIdRef.current = null // Reset ref for new session
     setIsLoadingSession(false)
-    // Don't auto-close sidebar when creating new session
+    
+    // Reset the flag after a short delay to allow state updates to complete
+    setTimeout(() => {
+      setIsDeletingSession(false)
+    }, 100)
   }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  // Function to handle sidebar toggle with animation
+  const toggleSidebarWithAnimation = () => {
+    setShowHistoryPanel(!showHistoryPanel)
   }
 
   // Function to fetch user projects for AI context
@@ -714,89 +740,98 @@ What would you like to discuss about your projects today?`
         <div style={styles.chatGPTLayout}>
           
           {/* Left Sidebar - History */}
-          {showHistoryPanel && (
-            <div style={styles.sidebar}>
-              <div style={styles.sidebarHeader}>
-                <button
-                  onClick={createNewSession}
-                  style={styles.newChatButton}
-                  className="newChatButton"
-                  title="Start new conversation"
-                >
-                  <Plus size={16} />
-                  <span>New Chat</span>
-                </button>
-                
-                {savedSessions.length > 0 && (
-                  <button
-                    onClick={clearAllHistory}
-                    style={styles.clearAllButton}
-                    className="clearAllButton"
-                    title="Delete all conversations"
-                  >
-                    <Trash2 size={16} />
-                    <span>Clear All History</span>
-                  </button>
-                )}
-              </div>
+          <div 
+            style={{
+              ...styles.sidebar,
+              transform: showHistoryPanel ? 'translateX(0)' : 'translateX(-100%)',
+            }}
+          >
+            <div style={styles.sidebarHeader}>
+              <button
+                onClick={createNewSession}
+                style={styles.newChatButton}
+                className="newChatButton"
+                title="Start new conversation"
+              >
+                <Plus size={16} />
+                <span>New Chat</span>
+              </button>
               
-              <div style={styles.sidebarContent} className="sidebarContent">
-                {savedSessions.length === 0 ? (
-                  <div style={styles.emptySidebar}>
-                    <p style={styles.emptySidebarText}>No conversations yet</p>
-                  </div>
-                ) : (
-                  <div style={styles.conversationsList}>
-                    {savedSessions.map((session) => (
-                      <div
-                        key={session.id}
-                        style={{
-                          ...styles.conversationItem,
-                          ...(currentSessionId === session.id ? styles.activeConversationItem : {})
-                        }}
-                        onClick={() => loadSession(session.id)}
-                        className="conversationItem"
-                      >
-                        <div style={styles.conversationInfo}>
-                          <h3 style={styles.conversationName}>{session.name}</h3>
-                          <div style={styles.conversationMeta}>
-                            <span style={styles.conversationDate}>
-                              {new Date(session.updatedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            deleteSession(session.id)
-                          }}
-                          style={styles.deleteConversationButton}
-                          title="Delete conversation"
-                          className="deleteConversationButton"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {savedSessions.length > 0 && (
+                <button
+                  onClick={clearAllHistory}
+                  style={styles.clearAllButton}
+                  className="clearAllButton"
+                  title="Delete all conversations"
+                >
+                  <Trash2 size={16} />
+                  <span>Clear All History</span>
+                </button>
+              )}
             </div>
-          )}
+            
+            <div style={styles.sidebarContent} className="sidebarContent">
+              {savedSessions.length === 0 ? (
+                <div style={styles.emptySidebar}>
+                  <p style={styles.emptySidebarText}>No conversations yet</p>
+                </div>
+              ) : (
+                <div style={styles.conversationsList}>
+                  {savedSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      style={{
+                        ...styles.conversationItem,
+                        ...(currentSessionId === session.id ? styles.activeConversationItem : {})
+                      }}
+                      onClick={() => loadSession(session.id)}
+                      className="conversationItem"
+                    >
+                      <div style={styles.conversationInfo}>
+                        <h3 style={styles.conversationName}>{session.name}</h3>
+                        <div style={styles.conversationMeta}>
+                          <span style={styles.conversationDate}>
+                            {new Date(session.updatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteSession(session.id)
+                        }}
+                        style={styles.deleteConversationButton}
+                        title="Delete conversation"
+                        className="deleteConversationButton"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           
           {/* Main Chat Area */}
-          <div style={styles.mainChatArea}>
+          <div style={{
+            ...styles.mainChatArea,
+            marginLeft: showHistoryPanel ? "clamp(240px, 25vw, 320px)" : "0",
+          }}>
             {/* Header */}
             <div style={styles.chatHeader}>
               <div style={styles.chatHeaderContent}>
                 <div style={styles.chatHeaderTop}>
                   <button
-                    onClick={() => setShowHistoryPanel(!showHistoryPanel)}
-                    style={styles.toggleSidebarButton}
+                    onClick={toggleSidebarWithAnimation}
+                    style={{
+                      ...styles.toggleSidebarButton,
+                      transform: showHistoryPanel ? 'rotate(0deg)' : 'rotate(180deg)',
+                    }}
                     className="toggleSidebarButton"
                     title={showHistoryPanel ? "Hide history" : "Show history"}
                   >
-                    <History size={20} />
+                    <Menu size={20} />
                   </button>
                   <h1 style={styles.chatTitle}>
                     <BotMessageSquare size={24} color="#3B82F6" />
@@ -942,7 +977,7 @@ What would you like to discuss about your projects today?`
                 </div>
                 <p style={styles.inputHint}>
                   {isTyping || isRevealing ? (
-                    <>AI is responding... Conversations auto-saved</>
+                    <>AI is responding... Conversations auto-saved</> 
                   ) : (
                     <>Press Enter to send • Conversations auto-saved</>
                   )}
@@ -996,6 +1031,7 @@ const styles = {
     overflow: "hidden",
     border: "1px solid #E2E8F0",
     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+    position: "relative",
   },
   
   // Sidebar Styles
@@ -1007,6 +1043,11 @@ const styles = {
     flexDirection: "column",
     height: "100%",
     boxShadow: "6px 6px 12px rgba(0, 0, 0, 0.03), -6px -6px 12px rgba(255, 255, 255, 0.8)",
+    position: "absolute",
+    left: 0,
+    top: 0,
+    zIndex: 10,
+    transition: "transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
   },
   sidebarHeader: {
     padding: "1rem",
@@ -1129,6 +1170,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     backgroundColor: "white",
+    transition: "all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
   },
   chatHeader: {
     padding: "1rem 1.25rem",
@@ -1155,7 +1197,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    transition: "all 0.2s",
+    transition: "all 0.3s ease",
     color: "#64748B",
   },
   chatTitle: {
@@ -1456,6 +1498,7 @@ styleSheet.innerText = `
   .toggleSidebarButton:hover {
     background-color: #E2E8F0;
     color: #1E293B;
+    filter: brightness(1.1);
   }
 
   .messageInput:focus {

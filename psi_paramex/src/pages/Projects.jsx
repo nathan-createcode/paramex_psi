@@ -306,7 +306,7 @@ export default function ProjectManagementPage() {
                 client_name: formData.client,
                 start_date: formData.startDate,
                 deadline: formData.deadline,
-                payment_amount: Math.min(parseInt(formData.payment) || 0, 2147483647),
+                payment_amount: Math.min(parseFloat(formData.payment) || 0, 2147483647),
                 difficulty_level: formData.difficulty,
                 type_id: formData.type,
                 status_id: formData.status,
@@ -369,7 +369,7 @@ export default function ProjectManagementPage() {
                   client_name: formData.client,
                   start_date: formData.startDate,
                   deadline: formData.deadline,
-                  payment_amount: Math.min(parseInt(formData.payment) || 0, 2147483647),
+                  payment_amount: Math.min(parseFloat(formData.payment) || 0, 2147483647),
                   difficulty_level: formData.difficulty,
                   type_id: formData.type,
                   status_id: formData.status,
@@ -392,7 +392,7 @@ export default function ProjectManagementPage() {
 
       {contextMenu.visible && (
         <div
-          className="absolute z-50 bg-white border border-gray-100 rounded-lg shadow-md w-36"
+          className="absolute z-[70] bg-white border border-gray-100 rounded-lg shadow-md w-36"
           style={{
             top: contextMenu.y,
             left: contextMenu.x,
@@ -449,7 +449,7 @@ export default function ProjectManagementPage() {
       )}
 
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 bg-opacity-50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 bg-opacity-50">
           <div className="bg-white rounded-lg shadow-md p-6 w-[90%] max-w-md">
             <h2 className="text-lg font-semibold mb-4 text-gray-800">
               Are you sure you want to delete this project?

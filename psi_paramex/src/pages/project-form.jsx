@@ -38,14 +38,6 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
   const [projectHistory, setProjectHistory] = useState([]);
   const [showRecommendations, setShowRecommendations] = useState(true);
 
-  // Get today's date in YYYY-MM-DD format for min attribute
-  const getTodayDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  };
-
-  const todayDate = getTodayDate();
-
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -223,18 +215,6 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     if (!editMode) {
       const startDate = new Date(formData.startDate);
       const deadline = new Date(formData.deadline);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Set to start of day for comparison
-      
-      if (startDate < today) {
-        alert("Start date cannot be in the past");
-        return;
-      }
-      
-      if (deadline < today) {
-        alert("Deadline cannot be in the past");
-        return;
-      }
       
       if (deadline < startDate) {
         alert("Deadline cannot be before start date");
@@ -247,44 +227,97 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
 
   const formatCurrency = (value) => {
     if (!value) return "";
-    // Remove any non-numeric characters except digits
-    let numericValue = value.toString().replace(/[^\d]/g, "");
     
-    // Limit to maximum 15 digits to prevent precision issues
-    if (numericValue.length > 15) {
-      numericValue = numericValue.slice(0, 15);
+    // Convert to string and clean up
+    let stringValue = value.toString();
+    
+    // Remove any characters except digits, dots, and commas
+    stringValue = stringValue.replace(/[^\d.,]/g, "");
+    
+    // Handle multiple dots - keep only the last one as decimal separator
+    const parts = stringValue.split('.');
+    if (parts.length > 2) {
+      // If multiple dots, treat all but the last as part of the integer
+      const integerPart = parts.slice(0, -1).join('');
+      const decimalPart = parts[parts.length - 1];
+      stringValue = integerPart + '.' + decimalPart;
     }
     
-    // Format with dot as thousand separator
-    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    // Split into integer and decimal parts
+    const [integerPart, decimalPart] = stringValue.split('.');
+    
+    // Remove any non-digit characters from integer part
+    let cleanInteger = integerPart.replace(/[^\d]/g, "");
+    
+    // Limit to maximum 15 digits for integer part
+    if (cleanInteger.length > 15) {
+      cleanInteger = cleanInteger.slice(0, 15);
+    }
+    
+    // Format integer part with comma as thousand separator
+    let formattedInteger = cleanInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    
+    // Handle decimal part
+    if (decimalPart !== undefined) {
+      // Clean decimal part (only digits)
+      let cleanDecimal = decimalPart.replace(/[^\d]/g, "");
+      // Limit to 2 decimal places
+      if (cleanDecimal.length > 2) {
+        cleanDecimal = cleanDecimal.slice(0, 2);
+      }
+      return formattedInteger + '.' + cleanDecimal;
+    }
+    
+    return formattedInteger;
   };
 
   const parseCurrency = (value) => {
     if (!value) return "";
-    // Remove dots (thousand separators) and keep only digits
-    let numericValue = value.toString().replace(/\./g, "").replace(/[^\d]/g, "");
     
-    // Limit to maximum 15 digits
-    if (numericValue.length > 15) {
-      numericValue = numericValue.slice(0, 15);
+    // Convert to string
+    let stringValue = value.toString();
+    
+    // Split into integer and decimal parts
+    const [integerPart, decimalPart] = stringValue.split('.');
+    
+    // Remove commas from integer part and keep only digits
+    let cleanInteger = integerPart.replace(/[^\d]/g, "");
+    
+    // Limit to maximum 15 digits for integer part
+    if (cleanInteger.length > 15) {
+      cleanInteger = cleanInteger.slice(0, 15);
     }
     
-    return numericValue === "" ? "" : numericValue;
+    // Handle decimal part
+    if (decimalPart !== undefined) {
+      // Clean decimal part (only digits) and limit to 2 places
+      let cleanDecimal = decimalPart.replace(/[^\d]/g, "");
+      if (cleanDecimal.length > 2) {
+        cleanDecimal = cleanDecimal.slice(0, 2);
+      }
+      return cleanInteger + '.' + cleanDecimal;
+    }
+    
+    return cleanInteger === "" ? "" : cleanInteger;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     
+    // Special handling for payment field
+    if (name === "payment") {
+      // Allow user to type decimals naturally
+      const cleanValue = parseCurrency(value);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: cleanValue,
+      }));
+      return;
+    }
+    
     // Special handling for date fields when not in edit mode
     if (!editMode && (name === "startDate" || name === "deadline")) {
       const selectedDate = new Date(value);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (selectedDate < today) {
-        alert(`${name === "startDate" ? "Start date" : "Deadline"} cannot be in the past`);
-        return;
-      }
       
       // If setting deadline, make sure it's not before start date
       if (name === "deadline" && formData.startDate) {
@@ -307,7 +340,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
     
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "payment" ? parseCurrency(value) : value,
+      [name]: value,
     }));
   };
 
@@ -529,7 +562,6 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleChange}
-                      min={!editMode ? todayDate : undefined}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     />
@@ -547,7 +579,7 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       name="deadline"
                       value={formData.deadline}
                       onChange={handleChange}
-                      min={!editMode ? (formData.startDate || todayDate) : undefined}
+                      min={!editMode ? formData.startDate : undefined}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     />
@@ -565,11 +597,14 @@ export function ProjectForm({ onClose, onSubmit, loading, initialData = null, ed
                       name="payment"
                       value={formatCurrency(formData.payment)}
                       onChange={handleChange}
-                      placeholder="Enter Payment Amount"
+                      placeholder="Enter amount (e.g., 1,500.50 or 1.5)"
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use dot (.) for decimals, comma (,) for thousands
+                  </p>
                 </div>
 
                 <div>
