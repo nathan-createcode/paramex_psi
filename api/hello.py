@@ -1,10 +1,8 @@
-from fastapi import FastAPI
-from mangum import Mangum
-
-app = FastAPI()
-
-@app.get("/api/hello")
-def hello():
-    return {"message": "Hello from Vercel API!", "status": "working"}
-
-handler = Mangum(app) 
+def handler(request):
+    return {
+        'statusCode': 200,
+        'headers': {
+            'Content-Type': 'application/json',
+        },
+        'body': '{"message": "Hello from Vercel Python!", "status": "working"}'
+    } 

@@ -2,13 +2,75 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Flowtica - Manage Freelance Projects</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Flowtica - Deployment Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 5px;
+    }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
+  <div class="container">
+    <h1>🚀 Flowtica Deployment Test</h1>
+    <p>Testing Vercel deployment...</p>
+    <button onclick="testAPI()">Test API Function</button>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    async function testAPI() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = 'Testing API...';
+      
+      try {
+        const response = await fetch('/api/hello');
+        const data = await response.json();
+        resultDiv.innerHTML = `
+          <h3>✅ API Test Successful!</h3>
+          <p>Status: ${response.status}</p>
+          <p>Message: ${data.message}</p>
+          <p>Status: ${data.status}</p>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <h3>❌ API Test Failed</h3>
+          <p>Error: ${error.message}</p>
+        `;
+      }
+    }
+  </script>
 </body>
 </html>

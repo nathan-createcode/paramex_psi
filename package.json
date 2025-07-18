@@ -2,10 +2,6 @@
   "name": "paramex_psi",
   "version": "1.0.0",
   "scripts": {
-    "build": "cd psi_paramex && npm run build",
-    "dev": "cd psi_paramex && npm run dev",
-    "install-deps": "cd psi_paramex && npm install"
-  },
-  "devDependencies": {},
-  "dependencies": {}
+    "dev": "echo 'Static site - no dev server needed'"
+  }
 } 
