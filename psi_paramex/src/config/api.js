@@ -4,7 +4,7 @@ const API_CONFIG = {
     baseURL: "http://localhost:8000"
   },
   production: {
-    baseURL: "https://a1751af609f9.ngrok-free.app"  // Current ngrok URL
+    baseURL: "https://f5e165ccf9a2.ngrok-free.app"  // Current ngrok URL
   }
 }
 
