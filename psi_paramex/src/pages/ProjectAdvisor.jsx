@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import { supabase } from "../supabase/supabase"
 import Layout from "../components/Layout"
 import { BotMessageSquare, Menu, Save, Trash2, Plus, FolderOpen } from "lucide-react"
+import { API_ENDPOINTS } from "../config/api"
 
 const ProjectAdvisor = () => {
   // Load messages from localStorage or use default
@@ -393,11 +394,11 @@ const ProjectAdvisor = () => {
     setShowHistoryPanel(!showHistoryPanel)
   }
 
-  // Function to fetch user projects for AI context
+    // Function to fetch user projects for AI context
   const fetchUserProjects = async (userId) => {
     try {
       console.log('🔍 Fetching projects for AI context...')
-      const response = await fetch(`https://0e0c6f0c9622.ngrok-free.app/api/user-projects/${userId}`)
+      const response = await fetch(API_ENDPOINTS.userProjects(userId))
       if (response.ok) {
         const data = await response.json()
         setUserProjects(data.projects || [])
@@ -452,7 +453,7 @@ const ProjectAdvisor = () => {
   // Call Groq AI API for real AI responses
   const generateAIResponse = async (userMessage, conversationHistory) => {
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch(API_ENDPOINTS.chat, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -484,7 +485,7 @@ const ProjectAdvisor = () => {
       
       // More specific error messages based on the error type
       if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        return "I'm having trouble connecting to the AI server. Please make sure the backend server is running on localhost:8000 and try again."
+        return "I'm having trouble connecting to the AI server. Please make sure the backend server is running and try again."
       } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
         return "The AI server is experiencing technical difficulties. This might be due to:\n\n• Groq API issues\n• Server configuration problems\n• Database connection issues\n\nPlease try again in a few moments. If the problem persists, check the backend server logs for more details."
       } else if (error.message.includes('404')) {

@@ -101,9 +101,15 @@ except Exception as e:
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",  # Vite dev server
+        "https://paramex-psi.vercel.app",  # Production Vercel deployment
+        "https://paramex-psi.vercel.app/",  # With trailing slash
+        "*",  # Allow all origins for deployment flexibility
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -327,9 +333,9 @@ async def chat_with_advisor(request: ChatRequest):
         # Enhanced message with better context
         enhanced_message = f"{request.message}"
         
-        # Add time context only if relevant
-        if any(time_word in request.message.lower() for time_word in ['today', 'now', 'current', 'when', 'time', 'date']):
-            enhanced_message += f"\n\n[Current time: {current_datetime.strftime('%A, %B %d, %Y at %I:%M %p')} Jakarta time]"
+        # ALWAYS include current time context for better AI responses
+        current_time_info = f"\n\n[CURRENT TIME CONTEXT: {current_datetime.strftime('%A, %B %d, %Y at %I:%M %p')} Jakarta time (GMT+7)]"
+        enhanced_message += current_time_info
         
         # Include project context if available and relevant
         if project_context.strip():
