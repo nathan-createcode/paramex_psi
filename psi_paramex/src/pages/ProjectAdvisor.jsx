@@ -397,7 +397,7 @@ const ProjectAdvisor = () => {
   const fetchUserProjects = async (userId) => {
     try {
       console.log('🔍 Fetching projects for AI context...')
-      const response = await fetch(`http://localhost:8000/api/user-projects/${userId}`)
+      const response = await fetch(`https://0e0c6f0c9622.ngrok-free.app/api/user-projects/${userId}`)
       if (response.ok) {
         const data = await response.json()
         setUserProjects(data.projects || [])
