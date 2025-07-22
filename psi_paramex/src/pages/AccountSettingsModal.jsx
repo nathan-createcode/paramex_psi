@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { User, Lock, Bell, Palette, Save, X } from "lucide-react"
 import { supabase } from "../supabase/supabase" // Sesuaikan path
@@ -42,24 +41,24 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
   const loadUserData = async () => {
     try {
       setLoading(true)
-      
+
       // Get current user dari Supabase Auth
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
       if (authError) {
         console.error("Error getting user:", authError)
         showMessage("Error loading user data", "error")
         return
       }
-
       if (!user) {
         console.error("No user found")
         showMessage("No user session found", "error")
         return
       }
-
       setCurrentUser(user)
-
       // Get additional user data dari tabel users (jika ada)
       const { data: userData, error: userError } = await supabase
         .from("users")
@@ -69,15 +68,18 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
       // Populate form dengan data user
       const userMetadata = user.user_metadata || {}
-      
-      setFormData(prev => ({
+
+      setFormData((prev) => ({
         ...prev,
         fullName: userData?.name || userMetadata.full_name || userMetadata.display_name || "",
         email: user.email || "",
         phone: userData?.phone_number || userMetadata.phone || "",
         company: userMetadata.company || "",
         // If max_projects_per_month is null or undefined, set to empty string for the input field
-        maxProjectsPerMonth: userData?.max_projects_per_month !== null && userData?.max_projects_per_month !== undefined ? userData.max_projects_per_month.toString() : "",
+        maxProjectsPerMonth:
+          userData?.max_projects_per_month !== null && userData?.max_projects_per_month !== undefined
+            ? userData.max_projects_per_month.toString()
+            : "",
         // Reset password fields
         currentPassword: "",
         newPassword: "",
@@ -87,7 +89,6 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
         pushNotifications: userMetadata.push_notifications !== undefined ? userMetadata.push_notifications : false,
         theme: userMetadata.theme || "light",
       }))
-
     } catch (error) {
       console.error("Error loading user data:", error)
       showMessage("Failed to load user data", "error")
@@ -120,7 +121,6 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     `
     document.body.appendChild(successMessage)
-
     setTimeout(() => {
       if (document.body.contains(successMessage)) {
         document.body.removeChild(successMessage)
@@ -133,21 +133,19 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
       showMessage("No user session found", "error")
       return
     }
-
     // Validate max projects per month
-    let maxProjectsToSave = null; // Default to null if empty or invalid
+    let maxProjectsToSave = null // Default to null if empty or invalid
     if (formData.maxProjectsPerMonth !== "") {
-      const parsedMaxProjects = parseInt(formData.maxProjectsPerMonth);
-      if (isNaN(parsedMaxProjects) || parsedMaxProjects < 1 || parsedMaxProjects > 50) {
-        showMessage("Max projects per month must be between 1 and 50", "error");
-        return;
+      const parsedMaxProjects = Number.parseInt(formData.maxProjectsPerMonth)
+      if (Number.isNaN(parsedMaxProjects) || parsedMaxProjects < 1 || parsedMaxProjects > 50) {
+        showMessage("Max projects per month must be between 1 and 50", "error")
+        return
       }
-      maxProjectsToSave = parsedMaxProjects;
+      maxProjectsToSave = parsedMaxProjects
     }
 
     try {
       setSaving(true)
-
       // Update auth user metadata
       const { error: authError } = await supabase.auth.updateUser({
         data: {
@@ -155,9 +153,8 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
           display_name: formData.fullName,
           phone: formData.phone,
           company: formData.company,
-        }
+        },
       })
-
       if (authError) throw authError
 
       // Check if user record exists first
@@ -179,19 +176,17 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
             name: formData.fullName,
             phone_number: formData.phone,
             max_projects_per_month: maxProjectsToSave,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq("user_id", currentUser.id)
-
         if (updateError) throw updateError
       } else {
         // User doesn't exist, insert new record
         // Generate a default password for the password column (if required)
-        const defaultPassword = "temp_password_" + Math.random().toString(36).substring(2, 15);
-        
-        const { error: insertError } = await supabase
-          .from("users")
-          .insert([{
+        const defaultPassword = `temp_password_${Math.random().toString(36).substring(2, 15)}`
+
+        const { error: insertError } = await supabase.from("users").insert([
+          {
             user_id: currentUser.id,
             name: formData.fullName,
             email: formData.email,
@@ -199,22 +194,22 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
             password: defaultPassword, // Add password field to satisfy NOT NULL constraint
             max_projects_per_month: maxProjectsToSave,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
-        
+            updated_at: new Date().toISOString(),
+          },
+        ])
+
         if (insertError) throw insertError
       }
 
       showMessage("Profile updated successfully!")
-      
+
       // Reload user data to verify the save
       setTimeout(() => {
         loadUserData()
       }, 1000)
-      
     } catch (error) {
       console.error("Error updating profile:", error)
-      
+
       // Provide more specific error messages
       if (error.message?.includes("row-level security policy")) {
         showMessage("Permission denied. Please contact administrator to set up proper database permissions.", "error")
@@ -232,12 +227,10 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
   const handleSavePassword = async () => {
     if (!currentUser) return
-
     if (formData.newPassword !== formData.confirmPassword) {
       showMessage("New passwords do not match", "error")
       return
     }
-
     if (formData.newPassword.length < 6) {
       showMessage("Password must be at least 6 characters", "error")
       return
@@ -245,23 +238,20 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
     try {
       setSaving(true)
-
       const { error } = await supabase.auth.updateUser({
-        password: formData.newPassword
+        password: formData.newPassword,
       })
-
       if (error) throw error
 
       // Clear password fields
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         currentPassword: "",
         newPassword: "",
-        confirmPassword: ""
+        confirmPassword: "",
       }))
 
       showMessage("Password updated successfully!")
-      
     } catch (error) {
       console.error("Error updating password:", error)
       showMessage(error.message || "Failed to update password", "error")
@@ -272,21 +262,17 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
   const handleSaveNotifications = async () => {
     if (!currentUser) return
-
     try {
       setSaving(true)
-
       const { error } = await supabase.auth.updateUser({
         data: {
           email_notifications: formData.emailNotifications,
           push_notifications: formData.pushNotifications,
-        }
+        },
       })
-
       if (error) throw error
 
       showMessage("Notification preferences saved!")
-      
     } catch (error) {
       console.error("Error saving notifications:", error)
       showMessage("Failed to save notification preferences", "error")
@@ -297,20 +283,16 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
   const handleSaveTheme = async () => {
     if (!currentUser) return
-
     try {
       setSaving(true)
-
       const { error } = await supabase.auth.updateUser({
         data: {
           theme: formData.theme,
-        }
+        },
       })
-
       if (error) throw error
 
       showMessage("Theme preference saved!")
-      
     } catch (error) {
       console.error("Error saving theme:", error)
       showMessage("Failed to save theme preference", "error")
@@ -356,77 +338,63 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
   const renderContent = () => {
     if (loading) {
       return (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "300px" }}>
-          <div style={{ fontSize: "16px", color: "#6B7280" }}>Loading user data...</div>
+        <div className="loading-container">
+          <div className="loading-text">Loading user data...</div>
         </div>
       )
     }
 
     return (
-      <div style={{ maxWidth: "500px" }}>
+      <div className="content-wrapper">
         {activeTab === "profile" && (
           <>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
-              Profile Information
-            </h2>
-            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
-              Update your account details and personal information
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: "16px",
-                marginBottom: "24px",
-              }}
-            >
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Full Name</label>
+            <h2 className="section-title">Profile Information</h2>
+            <p className="section-description">Update your account details and personal information</p>
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="form-label">Full Name</label>
                 <input
                   type="text"
                   value={formData.fullName}
                   onChange={(e) => handleInputChange("fullName", e.target.value)}
-                  style={styles.input}
+                  className="form-input"
                   placeholder="Enter your full name"
                 />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Email</label>
+              <div className="form-field">
+                <label className="form-label">Email</label>
                 <input
                   type="email"
                   value={formData.email}
-                  style={{ ...styles.input, backgroundColor: "#F9FAFB", cursor: "not-allowed" }}
+                  className="form-input form-input-readonly"
                   readOnly
                   title="Email cannot be changed"
                 />
-                <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>
-                  Email address cannot be changed
-                </p>
+                <p className="form-hint">Email address cannot be changed</p>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Phone</label>
+              <div className="form-field">
+                <label className="form-label">Phone</label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
-                  style={styles.input}
+                  className="form-input"
                   placeholder="Enter your phone number"
                 />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Company</label>
+              <div className="form-field">
+                <label className="form-label">Company</label>
                 <input
                   type="text"
                   value={formData.company}
                   onChange={(e) => handleInputChange("company", e.target.value)}
-                  style={styles.input}
+                  className="form-input"
                   placeholder="Enter your company name"
                 />
               </div>
-              
             </div>
-            <button 
-              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+            <button
+              className={`save-button ${saving ? "saving" : ""}`}
               onClick={() => handleSave("Profile")}
               disabled={saving}
             >
@@ -438,41 +406,32 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
         {activeTab === "security" && (
           <>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>Security</h2>
-            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
-              Update your password to keep your account secure
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: "16px",
-                marginBottom: "24px",
-              }}
-            >
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>New Password</label>
+            <h2 className="section-title">Security</h2>
+            <p className="section-description">Update your password to keep your account secure</p>
+            <div className="form-grid-single">
+              <div className="form-field">
+                <label className="form-label">New Password</label>
                 <input
                   type="password"
                   value={formData.newPassword}
                   onChange={(e) => handleInputChange("newPassword", e.target.value)}
-                  style={styles.input}
+                  className="form-input"
                   placeholder="Enter new password (min. 6 characters)"
                 />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Confirm New Password</label>
+              <div className="form-field">
+                <label className="form-label">Confirm New Password</label>
                 <input
                   type="password"
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                  style={styles.input}
+                  className="form-input"
                   placeholder="Confirm new password"
                 />
               </div>
             </div>
-            <button 
-              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+            <button
+              className={`save-button ${saving ? "saving" : ""}`}
               onClick={() => handleSave("Password")}
               disabled={saving || !formData.newPassword || !formData.confirmPassword}
             >
@@ -484,44 +443,36 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
         {activeTab === "notifications" && (
           <>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
-              Notifications
-            </h2>
-            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
-              Choose how you want to be notified
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "24px" }}>
-              <div style={styles.notificationItem}>
-                <div>
-                  <h4 style={{ fontSize: "14px", fontWeight: "500", color: "#1F2937", margin: "0 0 4px 0" }}>
-                    Email Notifications
-                  </h4>
-                  <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>Receive notifications via email</p>
+            <h2 className="section-title">Notifications</h2>
+            <p className="section-description">Choose how you want to be notified</p>
+            <div className="notification-list">
+              <div className="notification-item">
+                <div className="notification-info">
+                  <h4 className="notification-title">Email Notifications</h4>
+                  <p className="notification-description">Receive notifications via email</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={formData.emailNotifications}
                   onChange={(e) => handleInputChange("emailNotifications", e.target.checked)}
-                  style={styles.checkbox}
+                  className="notification-checkbox"
                 />
               </div>
-              <div style={styles.notificationItem}>
-                <div>
-                  <h4 style={{ fontSize: "14px", fontWeight: "500", color: "#1F2937", margin: "0 0 4px 0" }}>
-                    Push Notifications
-                  </h4>
-                  <p style={{ fontSize: "12px", color: "#6B7280", margin: 0 }}>Receive push notifications in browser</p>
+              <div className="notification-item">
+                <div className="notification-info">
+                  <h4 className="notification-title">Push Notifications</h4>
+                  <p className="notification-description">Receive push notifications in browser</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={formData.pushNotifications}
                   onChange={(e) => handleInputChange("pushNotifications", e.target.checked)}
-                  style={styles.checkbox}
+                  className="notification-checkbox"
                 />
               </div>
             </div>
-            <button 
-              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+            <button
+              className={`save-button ${saving ? "saving" : ""}`}
               onClick={() => handleSave("Notifications")}
               disabled={saving}
             >
@@ -533,24 +484,22 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
 
         {activeTab === "appearance" && (
           <>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>Appearance</h2>
-            <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 24px 0" }}>
-              Customize the look and feel of your interface
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "24px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>Theme</label>
+            <h2 className="section-title">Appearance</h2>
+            <p className="section-description">Customize the look and feel of your interface</p>
+            <div className="form-field">
+              <label className="form-label">Theme</label>
               <select
                 value={formData.theme}
                 onChange={(e) => handleInputChange("theme", e.target.value)}
-                style={styles.select}
+                className="form-select"
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
                 <option value="system">System</option>
               </select>
             </div>
-            <button 
-              style={{ ...styles.saveButton, opacity: saving ? 0.7 : 1 }} 
+            <button
+              className={`save-button ${saving ? "saving" : ""}`}
               onClick={() => handleSave("Theme")}
               disabled={saving}
             >
@@ -564,41 +513,46 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
   }
 
   return (
-    <div style={styles.backdrop} onClick={handleBackdropClick}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={handleBackdropClick}>
+      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         {/* Close Button */}
-        <button style={styles.closeButton} onClick={onClose}>
+        <button className="close-button" onClick={onClose}>
           <X size={20} />
         </button>
 
-        <div style={styles.modalContent}>
+        <div className="modal-content">
+          {/* Mobile Tab Navigation */}
+          <div className="mobile-tabs">
+            {tabs.map((tab) => {
+              const IconComponent = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`mobile-tab ${activeTab === tab.id ? "active" : ""}`}
+                >
+                  <IconComponent size={18} />
+                  <span className="mobile-tab-label">{tab.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
           {/* Sidebar */}
-          <div style={styles.sidebar}>
-            <div style={styles.sidebarHeader}>
-              <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#1F2937", margin: "0 0 8px 0" }}>
-                Account Settings
-              </h3>
-              <p style={{ fontSize: "14px", color: "#6B7280", margin: "0 0 4px 0" }}>
-                Manage your account information and preferences
-              </p>
-              {currentUser && (
-                <p style={{ fontSize: "12px", color: "#9CA3AF", margin: 0 }}>
-                  Logged in as: {currentUser.email}
-                </p>
-              )}
+          <div className="sidebar">
+            <div className="sidebar-header">
+              <h3 className="sidebar-title">Account Settings</h3>
+              <p className="sidebar-description">Manage your account information and preferences</p>
+              {currentUser && <p className="sidebar-user">Logged in as: {currentUser.email}</p>}
             </div>
-            <nav style={styles.nav}>
+            <nav className="sidebar-nav">
               {tabs.map((tab) => {
                 const IconComponent = tab.icon
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      ...styles.tabButton,
-                      backgroundColor: activeTab === tab.id ? "#3B82F6" : "transparent",
-                      color: activeTab === tab.id ? "white" : "#6B7280",
-                    }}
+                    className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
                   >
                     <IconComponent size={18} />
                     <span>{tab.label}</span>
@@ -609,135 +563,474 @@ const AccountSettingsModal = ({ isOpen, onClose }) => {
           </div>
 
           {/* Content */}
-          <div style={styles.content}>{renderContent()}</div>
+          <div className="content">{renderContent()}</div>
         </div>
       </div>
+
+      <style jsx>{`
+        .modal-backdrop {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1.25rem;
+        }
+
+        .modal-container {
+          background-color: white;
+          border-radius: 0.75rem;
+          box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+          max-width: 56.25rem;
+          width: 100%;
+          max-height: 90vh;
+          overflow: hidden;
+          position: relative;
+        }
+
+        .close-button {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          padding: 0.5rem;
+          border: none;
+          background-color: transparent;
+          cursor: pointer;
+          border-radius: 0.375rem;
+          color: #6b7280;
+          z-index: 10;
+          transition: background-color 0.2s;
+        }
+
+        .close-button:hover {
+          background-color: #f3f4f6;
+        }
+
+        .modal-content {
+          display: flex;
+          height: 37.5rem;
+        }
+
+        .mobile-tabs {
+          display: none;
+          background-color: #f8f9fa;
+          border-bottom: 1px solid #e5e7eb;
+          padding: 0.5rem;
+          overflow-x: auto;
+        }
+
+        .mobile-tab {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.5rem 0.75rem;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-size: 0.75rem;
+          font-weight: 500;
+          transition: all 0.2s;
+          text-align: center;
+          background-color: transparent;
+          color: #6b7280;
+          min-width: 4rem;
+          flex-shrink: 0;
+        }
+
+        .mobile-tab.active {
+          background-color: #3b82f6;
+          color: white;
+        }
+
+        .mobile-tab-label {
+          font-size: 0.6875rem;
+        }
+
+        .sidebar {
+          width: 17.5rem;
+          background-color: #f8f9fa;
+          border-right: 1px solid #e5e7eb;
+          padding: 1.5rem;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .sidebar-header {
+          margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+          font-size: 1.125rem;
+          font-weight: 600;
+          color: #1f2937;
+          margin: 0 0 0.5rem 0;
+        }
+
+        .sidebar-description {
+          font-size: 0.875rem;
+          color: #6b7280;
+          margin: 0 0 0.25rem 0;
+        }
+
+        .sidebar-user {
+          font-size: 0.75rem;
+          color: #9ca3af;
+          margin: 0;
+        }
+
+        .sidebar-nav {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+
+        .tab-button {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-size: 0.875rem;
+          font-weight: 500;
+          transition: all 0.2s;
+          text-align: left;
+          background-color: transparent;
+          color: #6b7280;
+        }
+
+        .tab-button.active {
+          background-color: #3b82f6;
+          color: white;
+        }
+
+        .tab-button:hover:not(.active) {
+          background-color: #e5e7eb;
+        }
+
+        .content {
+          flex: 1;
+          padding: 2rem;
+          overflow: auto;
+        }
+
+        .loading-container {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 18.75rem;
+        }
+
+        .loading-text {
+          font-size: 1rem;
+          color: #6b7280;
+        }
+
+        .content-wrapper {
+          max-width: 31.25rem;
+        }
+
+        .section-title {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #1f2937;
+          margin: 0 0 0.5rem 0;
+        }
+
+        .section-description {
+          font-size: 0.875rem;
+          color: #6b7280;
+          margin: 0 0 1.5rem 0;
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .form-grid-single {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .form-field {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .form-label {
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #374151;
+        }
+
+        .form-input {
+          padding: 0.75rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-input-readonly {
+          background-color: #f9fafb;
+          cursor: not-allowed;
+        }
+
+        .form-select {
+          padding: 0.75rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          background-color: white;
+          cursor: pointer;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+
+        .form-select:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-hint {
+          font-size: 0.75rem;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .notification-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .notification-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1rem;
+          background-color: #f9fafb;
+          border-radius: 0.5rem;
+          border: 1px solid #e5e7eb;
+        }
+
+        .notification-info {
+          flex: 1;
+        }
+
+        .notification-title {
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #1f2937;
+          margin: 0 0 0.25rem 0;
+        }
+
+        .notification-description {
+          font-size: 0.75rem;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .notification-checkbox {
+          width: 1.25rem;
+          height: 1.25rem;
+          cursor: pointer;
+        }
+
+        .save-button {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1.5rem;
+          background-color: #3b82f6;
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        .save-button:hover:not(:disabled) {
+          background-color: #2563eb;
+        }
+
+        .save-button:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+
+        .save-button.saving {
+          opacity: 0.7;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+          .modal-backdrop {
+            padding: 0.5rem;
+          }
+
+          .modal-container {
+            max-height: 95vh;
+            border-radius: 0.5rem;
+          }
+
+          .close-button {
+            top: 0.75rem;
+            right: 0.75rem;
+          }
+
+          .modal-content {
+            flex-direction: column;
+            height: auto;
+            max-height: 90vh;
+          }
+
+          .mobile-tabs {
+            display: flex;
+            gap: 0.5rem;
+          }
+
+          .sidebar {
+            display: none;
+          }
+
+          .content {
+            padding: 1.5rem 1rem;
+            overflow-y: auto;
+          }
+
+          .content-wrapper {
+            max-width: 100%;
+          }
+
+          .section-title {
+            font-size: 1.125rem;
+          }
+
+          .section-description {
+            font-size: 0.8125rem;
+          }
+
+          .form-grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+          }
+
+          .form-input,
+          .form-select {
+            padding: 0.875rem 0.75rem;
+          }
+
+          .notification-item {
+            padding: 0.875rem;
+          }
+
+          .save-button {
+            width: 100%;
+            justify-content: center;
+            padding: 0.875rem 1.5rem;
+          }
+        }
+
+        /* Small Mobile Styles */
+        @media (max-width: 480px) {
+          .modal-backdrop {
+            padding: 0.25rem;
+          }
+
+          .close-button {
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.375rem;
+          }
+
+          .content {
+            padding: 1rem 0.75rem;
+          }
+
+          .section-title {
+            font-size: 1rem;
+          }
+
+          .section-description {
+            font-size: 0.75rem;
+          }
+
+          .mobile-tab {
+            padding: 0.375rem 0.5rem;
+            min-width: 3.5rem;
+          }
+
+          .mobile-tab-label {
+            font-size: 0.625rem;
+          }
+
+          .form-input,
+          .form-select {
+            padding: 0.75rem 0.625rem;
+            font-size: 0.8125rem;
+          }
+
+          .notification-item {
+            padding: 0.75rem;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75rem;
+          }
+
+          .notification-checkbox {
+            align-self: flex-end;
+          }
+        }
+
+        /* Large Desktop Styles */
+        @media (min-width: 1024px) {
+          .modal-container {
+            max-width: 62.5rem;
+          }
+
+          .sidebar {
+            width: 20rem;
+            padding: 2rem;
+          }
+
+          .content {
+            padding: 2.5rem;
+          }
+
+          .content-wrapper {
+            max-width: 37.5rem;
+          }
+
+          .form-grid {
+            grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+          }
+        }
+      `}</style>
     </div>
   )
 }
 
-const styles = {
-  backdrop: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-    padding: "20px",
-  },
-  modal: {
-    backgroundColor: "white",
-    borderRadius: "12px",
-    boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
-    maxWidth: "900px",
-    width: "100%",
-    maxHeight: "80vh",
-    overflow: "hidden",
-    position: "relative",
-  },
-  closeButton: {
-    position: "absolute",
-    top: "16px",
-    right: "16px",
-    padding: "8px",
-    border: "none",
-    backgroundColor: "transparent",
-    cursor: "pointer",
-    borderRadius: "6px",
-    color: "#6B7280",
-    zIndex: 10,
-    transition: "background-color 0.2s",
-  },
-  modalContent: {
-    display: "flex",
-    height: "600px",
-  },
-  sidebar: {
-    width: "280px",
-    backgroundColor: "#F8F9FA",
-    borderRight: "1px solid #E5E7EB",
-    padding: "24px",
-    display: "flex",
-    flexDirection: "column",
-  },
-  sidebarHeader: {
-    marginBottom: "32px",
-  },
-  nav: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  tabButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 16px",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-    transition: "all 0.2s",
-    textAlign: "left",
-  },
-  content: {
-    flex: 1,
-    padding: "32px",
-    overflow: "auto",
-  },
-  input: {
-    padding: "12px",
-    border: "1px solid #D1D5DB",
-    borderRadius: "8px",
-    fontSize: "14px",
-    outline: "none",
-    transition: "border-color 0.2s",
-  },
-  select: {
-    padding: "12px",
-    border: "1px solid #D1D5DB",
-    borderRadius: "8px",
-    fontSize: "14px",
-    backgroundColor: "white",
-    cursor: "pointer",
-    outline: "none",
-    transition: "border-color 0.2s",
-  },
-  checkbox: {
-    width: "20px",
-    height: "20px",
-    cursor: "pointer",
-  },
-  saveButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "12px 24px",
-    backgroundColor: "#3B82F6",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    fontSize: "14px",
-    fontWeight: "500",
-    cursor: "pointer",
-    transition: "background-color 0.2s",
-  },
-  notificationItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "16px",
-    backgroundColor: "#F9FAFB",
-    borderRadius: "8px",
-    border: "1px solid #E5E7EB",
-  },
-}
-
 export default AccountSettingsModal
-
